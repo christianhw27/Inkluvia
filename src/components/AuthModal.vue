@@ -263,12 +263,12 @@ const handleRegister = async () => {
                 </button>
                 <button
                   type="button"
-                  @click="email = 'siswa@gmail.com'; password = 'siswa123'; showDemoHint = false"
+                  @click="email = 'user@inkluvia.id'; password = 'user123'; showDemoHint = false"
                   class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
                 >
                   <div class="text-left">
-                    <p class="text-xs font-bold text-[#3587CE]">👧 Siswa — siswa@gmail.com</p>
-                    <p class="text-[11px] text-slate-500 font-mono">password: siswa123</p>
+                    <p class="text-xs font-bold text-[#3587CE]">👤 Pengguna (Siswa/Guru) — user@inkluvia.id</p>
+                    <p class="text-[11px] text-slate-500 font-mono">password: user123</p>
                   </div>
                   <span class="text-[10px] text-[#3587CE] font-semibold bg-blue-100 px-2 py-0.5 rounded-full">Isi Otomatis</span>
                 </button>
@@ -330,9 +330,9 @@ const handleRegister = async () => {
               <p class="text-[11px] text-slate-400 pl-1">Minimal 6 karakter</p>
             </div>
 
-            <!-- Role -->
+            <!-- Role Selection (2 Roles) -->
             <div class="space-y-1.5">
-              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Saya adalah</label>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Peran Akun</label>
               <div class="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -344,7 +344,7 @@ const handleRegister = async () => {
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                   ]"
                 >
-                  👧 Siswa
+                  👤 Pengguna
                 </button>
                 <button
                   type="button"
@@ -356,7 +356,7 @@ const handleRegister = async () => {
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                   ]"
                 >
-                  👨‍💼 Guru/Admin
+                  🛡️ Admin (CMS)
                 </button>
               </div>
             </div>

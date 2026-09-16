@@ -3,14 +3,21 @@ import { supabase, isSupabaseConfigured } from './supabaseClient'
 
 const AUTH_STORAGE_KEY = 'inkluvia_auth_session_v2'
 
-// Demo Accounts — digunakan hanya jika Supabase belum dikonfigurasi
+// Demo Accounts — 2 Peran Utama: Pengguna (Siswa & Guru) dan Administrator
 const DEMO_ACCOUNTS = [
   {
     email: 'admin@inkluvia.id',
     password: 'admin123',
     name: 'Admin Inkluvia',
     role: 'admin',
-    avatar: '👨‍💼'
+    avatar: '🛡️'
+  },
+  {
+    email: 'user@inkluvia.id',
+    password: 'user123',
+    name: 'Pengguna Inkluvia',
+    role: 'user',
+    avatar: '👤'
   },
   {
     email: 'siswa@gmail.com',

@@ -21,7 +21,6 @@ const emit = defineEmits(['openDetail'])
 const selectedJenjang = ref('Semua')
 const selectedMapel = ref('Semua')
 const selectedJenis = ref('Semua')
-const showFilters = ref(false)
 
 // Filter Options
 const jenjangOptions = ['Semua', 'SD', 'SMP', 'SMA']
@@ -60,62 +59,69 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-6">
     <!-- Banner Materi -->
-    <section class="relative rounded-3xl overflow-hidden shadow-sm border border-slate-100 min-h-[160px] sm:min-h-[180px] flex items-center bg-[#E6F3FD]">
+    <section class="relative rounded-3xl overflow-hidden shadow-sm border border-slate-100/90 min-h-[160px] sm:min-h-[190px] flex items-center bg-[#E6F3FD]">
       <img
         src="/Banner_Materi.jpg"
         alt="Banner Materi Inkluvia"
         class="absolute inset-0 w-full h-full object-cover object-right pointer-events-none select-none"
       />
-      <div class="absolute inset-0 bg-gradient-to-r from-[#DDF1FF]/95 via-[#E6F4FE]/80 to-transparent w-full md:w-3/5 pointer-events-none"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-[#DDF1FF]/95 via-[#E6F4FE]/85 to-transparent w-full md:w-3/5 pointer-events-none"></div>
       <div class="relative z-10 px-6 sm:px-10 lg:px-12 py-8 max-w-xl space-y-2">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-sm text-xs font-bold text-[#3587CE] border border-[#3DA5FF]/30">
+          <Sparkles class="w-3.5 h-3.5 text-[#3DA5FF]" />
+          Katalog Pembelajaran Inklusif
+        </div>
         <h1 class="text-2xl sm:text-3xl lg:text-[34px] font-extrabold text-[#0F3261] tracking-tight leading-tight">
           Jelajahi Materi Pembelajaran
         </h1>
-        <p class="text-sm text-slate-600 font-medium">
-          Temukan media pembelajaran yang sesuai dengan kebutuhanmu.
+        <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+          Temukan media pembelajaran yang sesuai dengan kebutuhan dan gaya belajarmu.
         </p>
       </div>
     </section>
 
-    <!-- Filter Section -->
-    <section class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <!-- Filter Section (Always Show directly, no hide/show toggle) -->
+    <section class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
       <!-- Filter Header -->
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-        <div class="flex items-center gap-2">
-          <SlidersHorizontal class="w-4 h-4 text-[#3587CE]" />
-          <span class="text-sm font-bold text-[#0F3261]">Filter Materi</span>
-          <span v-if="hasActiveFilter" class="w-2 h-2 rounded-full bg-[#FF7315] animate-pulse"></span>
-        </div>
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
         <div class="flex items-center gap-3">
-          <button
-            v-if="hasActiveFilter"
-            @click="resetFilters"
-            class="text-xs font-semibold text-rose-500 hover:text-rose-700 transition cursor-pointer"
-          >
-            Reset Filter
-          </button>
-          <button
-            @click="showFilters = !showFilters"
-            class="text-xs font-semibold text-[#3587CE] cursor-pointer"
-          >
-            {{ showFilters ? 'Sembunyikan' : 'Tampilkan' }}
-          </button>
+          <div class="w-9 h-9 rounded-xl bg-[#E6F3FD] flex items-center justify-center text-[#3587CE]">
+            <SlidersHorizontal class="w-4 h-4 text-[#3587CE]" />
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-bold text-[#0F3261]">Filter Materi</h2>
+              <span v-if="hasActiveFilter" class="w-2 h-2 rounded-full bg-[#FF7315] animate-pulse"></span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium">Pilih kategori untuk menyaring materi</p>
+          </div>
         </div>
+        
+        <button
+          v-if="hasActiveFilter"
+          @click="resetFilters"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition cursor-pointer"
+        >
+          Reset Filter
+        </button>
       </div>
 
-      <!-- Filter Chips -->
-      <div v-show="showFilters || hasActiveFilter" class="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-5 border-b border-slate-100">
+      <!-- Filter Chips Grid (Directly visible) -->
+      <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-slate-100 bg-slate-50/50">
         <!-- Jenjang -->
         <div class="space-y-2">
-          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Jenjang</label>
-          <div class="flex flex-wrap gap-1.5">
+          <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#3DA5FF]"></span>
+            Jenjang Pendidikan
+          </label>
+          <div class="flex flex-wrap gap-2">
             <button
               v-for="opt in jenjangOptions" :key="opt"
               @click="selectedJenjang = opt"
               :class="[
-                'px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer border',
+                'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border',
                 selectedJenjang === opt
                   ? 'bg-[#0F3261] text-white border-[#0F3261] shadow-sm'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-[#3DA5FF] hover:text-[#3587CE]'
@@ -126,15 +132,18 @@ const resetFilters = () => {
 
         <!-- Mata Pelajaran -->
         <div class="space-y-2">
-          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Mata Pelajaran</label>
-          <div class="flex flex-wrap gap-1.5">
+          <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#74DC2E]"></span>
+            Mata Pelajaran
+          </label>
+          <div class="flex flex-wrap gap-2">
             <button
               v-for="opt in mapelOptions" :key="opt"
               @click="selectedMapel = opt"
               :class="[
-                'px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer border',
+                'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border',
                 selectedMapel === opt
-                  ? 'bg-[#0F3261] text-white border-[#0F3261] shadow-sm'
+                  ? 'bg-[#3587CE] text-white border-[#3587CE] shadow-sm'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-[#3DA5FF] hover:text-[#3587CE]'
               ]"
             >{{ opt }}</button>
@@ -143,34 +152,30 @@ const resetFilters = () => {
 
         <!-- Jenis Media -->
         <div class="space-y-2">
-          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Jenis Media</label>
-          <div class="flex flex-wrap gap-1.5">
+          <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#FF74BC]"></span>
+            Jenis Media
+          </label>
+          <div class="flex flex-wrap gap-2">
             <button
               v-for="opt in jenisOptions" :key="opt"
               @click="selectedJenis = opt"
               :class="[
-                'px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer border',
+                'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border',
                 selectedJenis === opt
-                  ? 'bg-[#0F3261] text-white border-[#0F3261] shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-[#3DA5FF] hover:text-[#3587CE]'
+                  ? 'bg-[#E1529C] text-white border-[#E1529C] shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-[#FF74BC] hover:text-[#E1529C]'
               ]"
             >{{ opt }}</button>
           </div>
         </div>
       </div>
 
-      <!-- Hasil Pencarian Count -->
-      <div class="px-5 py-2.5 flex items-center justify-between">
-        <span class="text-xs text-slate-400">
-          Menampilkan <strong class="text-[#0F3261]">{{ filteredMateri.length }}</strong> materi
+      <!-- Hasil Pencarian Count Header -->
+      <div class="px-6 py-3 flex items-center justify-between bg-white text-xs">
+        <span class="text-slate-500 font-medium">
+          Menampilkan <strong class="text-[#0F3261] font-extrabold text-sm">{{ filteredMateri.length }}</strong> materi pembelajaran
         </span>
-        <button
-          v-if="!showFilters && !hasActiveFilter"
-          @click="showFilters = true"
-          class="text-xs text-[#3587CE] font-semibold cursor-pointer hover:underline"
-        >
-          Tampilkan Filter
-        </button>
       </div>
     </section>
 

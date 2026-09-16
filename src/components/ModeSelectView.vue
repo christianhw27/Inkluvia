@@ -20,7 +20,7 @@ const handleContinue = () => {
 
 <template>
   <div class="space-y-6 max-w-5xl mx-auto py-2">
-    <!-- Top Step Bar Matching Screenshot -->
+    <!-- Top Header Bar -->
     <div class="bg-white rounded-2xl px-5 sm:px-8 py-3.5 border border-slate-100/90 shadow-xs flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <button
@@ -37,31 +37,6 @@ const handleContinue = () => {
             {{ materi.level }}
           </p>
         </div>
-      </div>
-
-      <!-- Step Dots (1 to 5) -->
-      <div class="hidden sm:flex items-center gap-2">
-        <div
-          v-for="step in 5"
-          :key="step"
-          :class="[
-            'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition',
-            step === 1
-              ? 'bg-[#0F3261] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-400'
-          ]"
-        >
-          {{ step }}
-        </div>
-      </div>
-
-      <!-- Mini Mascot Avatar -->
-      <div class="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 overflow-hidden shrink-0 shadow-xs">
-        <img
-          src="/es_batu_card.jpg"
-          alt="Si Es Batu Mascot"
-          class="w-full h-full object-cover"
-        />
       </div>
     </div>
 
