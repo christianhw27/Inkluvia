@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* 03 - COLOR SYSTEM (Inkluvia Color Palette) */
+  /* Blue */
+  --color-ink-blue-bright: #3DA5FF;
+  --color-ink-blue-deep: #3587CE;
+
+  /* Pink */
+  --color-ink-pink-bright: #FF74BC;
+  --color-ink-pink-deep: #E1529C;
+
+  /* Yellow */
+  --color-ink-yellow-bright: #FFDC58;
+  --color-ink-yellow-deep: #D9BA40;
+
+  /* Green */
+  --color-ink-green-bright: #74DC2E;
+  --color-ink-green-deep: #54AA1B;
+
+  /* Brand Accents & Hierarchy */
+  --color-ink-orange: #FF7315;
+  --color-ink-orange-hover: #E86105;
+  --color-ink-orange-light: #FFF4EC;
+  --color-ink-navy: #0F3261;
+  --color-ink-navy-dark: #092040;
+  --color-ink-bg: #F4F8FD;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-ink-bg);
+  color: #1e293b;
+  overflow-x: hidden;
+}
