@@ -38,6 +38,7 @@ import LearningPlayerView from './components/LearningPlayerView.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 import AuthView from './components/AuthView.vue'
 import GuruView from './components/GuruView.vue'
+import PricingView from './components/PricingView.vue'
 import { materiList, selectedMateri } from './lib/materiService'
 import {
   currentUser,
@@ -376,6 +377,17 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               ]"
             >
               Untuk Guru
+            </button>
+            <button
+              @click="navigateTo('harga')"
+              :class="[
+                'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer',
+                currentNav === 'harga'
+                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
+                  : 'text-slate-600 hover:text-amber-600 hover:bg-amber-50'
+              ]"
+            >
+              Harga
             </button>
           </nav>
         </div>
@@ -1379,6 +1391,13 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       <GuruView />
     </main>
 
+    <!-- ==================== VIEW: PRICING (PAKET HARGA) ==================== -->
+    <main v-else-if="currentNav === 'harga'" class="w-full flex-1 flex flex-col">
+      <PricingView
+        @navigate-auth="navigateToAuth"
+      />
+    </main>
+
     <!-- ==================== VIEW: AUTH (LOGIN & REGISTER PAGE) ==================== -->
     <main v-else-if="currentNav === 'auth'" class="w-full flex-1 flex flex-col">
       <AuthView
@@ -1461,6 +1480,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               <li><button @click="navigateTo('beranda')" class="hover:text-[#3DA5FF] transition cursor-pointer">Beranda</button></li>
               <li><button @click="navigateTo('materi')" class="hover:text-[#3DA5FF] transition cursor-pointer">Katalog Materi</button></li>
               <li><button @click="navigateTo('guru')" class="hover:text-[#3DA5FF] transition cursor-pointer">Untuk Guru & Pengajar</button></li>
+              <li><button @click="navigateTo('harga')" class="hover:text-[#FF7315] font-semibold transition cursor-pointer">Paket Langganan (Harga)</button></li>
               <li v-if="isAdmin"><button @click="navigateTo('admin')" class="font-bold transition cursor-pointer" style="color: #FF7315;">Dashboard Admin (CMS)</button></li>
             </ul>
           </div>
