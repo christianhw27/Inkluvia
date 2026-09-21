@@ -59,40 +59,42 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Banner Materi -->
-    <section class="relative rounded-3xl overflow-hidden shadow-sm border border-slate-100/90 min-h-[160px] sm:min-h-[190px] flex items-center bg-[#E6F3FD]">
-      <img
-        src="/Banner_Materi.jpg"
-        alt="Banner Materi Inkluvia"
-        class="absolute inset-0 w-full h-full object-cover object-right pointer-events-none select-none"
-      />
-      <div class="absolute inset-0 bg-gradient-to-r from-[#DDF1FF]/95 via-[#E6F4FE]/85 to-transparent w-full md:w-3/5 pointer-events-none"></div>
-      <div class="relative z-10 px-6 sm:px-10 lg:px-12 py-8 max-w-xl space-y-2">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-sm text-xs font-bold text-[#3587CE] border border-[#3DA5FF]/30">
-          <Sparkles class="w-3.5 h-3.5 text-[#3DA5FF]" />
-          Katalog Pembelajaran Inklusif
+  <div class="w-full flex flex-col flex-1">
+    <!-- Banner Materi (Using official Banner_Materi.jpg with notebook artwork) -->
+    <section class="relative w-full overflow-hidden flex items-center py-10 sm:py-12 lg:py-16 min-h-[190px] sm:min-h-[220px]" style="background: #EBF5FF url('/Banner_Materi.jpg') no-repeat right center / cover;">
+      <!-- Subtle gradient tint for text legibility -->
+      <div class="absolute inset-0 pointer-events-none" style="background: linear-gradient(90deg, rgba(235,245,255,0.95) 0%, rgba(235,245,255,0.85) 50%, rgba(235,245,255,0.3) 100%);"></div>
+
+      <div class="relative z-10 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-10">
+        <div class="max-w-2xl space-y-2.5 text-left">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold border border-blue-200/80 bg-white/90 shadow-2xs text-[#0F3261]">
+            <Sparkles class="w-3.5 h-3.5 text-[#3DA5FF]" />
+            Katalog Pembelajaran Inklusif
+          </div>
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0F3261] tracking-tight leading-tight">
+            Jelajahi Materi
+            <span class="text-[#FF7315]">Pembelajaran</span>
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-lg">
+            Temukan media pembelajaran yang sesuai dengan kebutuhan dan gaya belajarmu.
+          </p>
         </div>
-        <h1 class="text-2xl sm:text-3xl lg:text-[34px] font-extrabold text-[#0F3261] tracking-tight leading-tight">
-          Jelajahi Materi Pembelajaran
-        </h1>
-        <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
-          Temukan media pembelajaran yang sesuai dengan kebutuhan dan gaya belajarmu.
-        </p>
       </div>
     </section>
 
-    <!-- Filter Section (Always Show directly, no hide/show toggle) -->
-    <section class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+    <!-- Main Content (Filter + Materi Grid) -->
+    <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-6 flex-1">
+      <!-- Filter Section -->
+      <section class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden" style="box-shadow: 0 4px 20px rgba(15,50,97,0.07);">
       <!-- Filter Header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100" style="background: linear-gradient(135deg, #F0F7FF 0%, white 100%);">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-[#E6F3FD] flex items-center justify-center text-[#3587CE]">
-            <SlidersHorizontal class="w-4 h-4 text-[#3587CE]" />
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #3DA5FF, #3587CE); box-shadow: 0 4px 10px rgba(61,165,255,0.30);">
+            <SlidersHorizontal class="w-4 h-4 text-white" />
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-sm font-bold text-[#0F3261]">Filter Materi</h2>
+              <h2 class="text-sm font-extrabold text-[#0F3261]">Filter Materi</h2>
               <span v-if="hasActiveFilter" class="w-2 h-2 rounded-full bg-[#FF7315] animate-pulse"></span>
             </div>
             <p class="text-[11px] text-slate-400 font-medium">Pilih kategori untuk menyaring materi</p>
@@ -202,26 +204,28 @@ const resetFilters = () => {
       <div
         v-for="item in filteredMateri"
         :key="item.id"
-        class="bg-white rounded-3xl border border-slate-100 p-5 sm:p-6 flex flex-col md:flex-row items-start gap-5 hover:shadow-lg transition-all duration-300 group"
-        style="box-shadow: 0 1px 4px rgba(0,0,0,0.04);"
+        class="bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col md:flex-row items-start hover:shadow-xl transition-all duration-300 group"
+        style="box-shadow: 0 2px 12px rgba(15,50,97,0.06);"
       >
         <!-- Thumbnail -->
-        <div class="w-full md:w-56 lg:w-64 h-44 sm:h-48 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-100 relative">
+        <div class="w-full md:w-64 lg:w-72 h-48 md:h-auto md:min-h-[200px] overflow-hidden shrink-0 bg-slate-100 relative">
           <img
             :src="item.image || '/es_batu_card.jpg'"
             :alt="item.title"
             class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
           />
+          <!-- Gradient overlay -->
+          <div class="absolute inset-0" style="background: linear-gradient(to top, rgba(15,50,97,0.35) 0%, transparent 45%);"></div>
           <!-- Badge -->
-          <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FF7315] text-white shadow">
+          <span class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-extrabold text-white shadow" style="background: linear-gradient(135deg, #FF7315, #E86105); box-shadow: 0 2px 8px rgba(255,115,21,0.4);">
             {{ item.badge || 'Gratis' }}
           </span>
         </div>
 
         <!-- Content -->
-        <div class="flex-1 flex flex-col justify-between h-full space-y-4 w-full text-left">
+        <div class="flex-1 flex flex-col justify-between p-5 sm:p-6 space-y-4 w-full text-left">
           <div class="space-y-2">
-            <p class="text-xs font-semibold text-slate-400">{{ item.level }}</p>
+            <p class="text-[11px] font-bold uppercase tracking-wider" style="color: #3587CE;">{{ item.level }}</p>
             <h2 class="text-xl sm:text-2xl font-extrabold text-[#0F3261] leading-tight">{{ item.title }}</h2>
             <p class="text-sm text-slate-600 leading-relaxed max-w-2xl">{{ item.description }}</p>
           </div>
@@ -229,17 +233,17 @@ const resetFilters = () => {
           <!-- Bottom Row -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <!-- Media Types -->
-            <div class="flex items-center gap-4 text-xs font-semibold text-slate-500 flex-wrap">
-              <span v-if="item.types?.includes('Video')" class="inline-flex items-center gap-1.5 text-[#3587CE]">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span v-if="item.types?.includes('Video')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style="background: #EBF5FF; color: #3587CE;">
                 <Video class="w-3.5 h-3.5" /> Video
               </span>
-              <span v-if="item.types?.includes('Interaktif')" class="inline-flex items-center gap-1.5 text-[#7B4699]">
+              <span v-if="item.types?.includes('Interaktif')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style="background: #FDF0F7; color: #E1529C;">
                 <Sparkles class="w-3.5 h-3.5" /> Interaktif
               </span>
-              <span v-if="item.types?.includes('Worksheet')" class="inline-flex items-center gap-1.5 text-emerald-600">
+              <span v-if="item.types?.includes('Worksheet')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style="background: #F0FBE6; color: #54AA1B;">
                 <FileText class="w-3.5 h-3.5" /> Worksheet
               </span>
-              <span v-if="item.types?.includes('Evaluasi')" class="inline-flex items-center gap-1.5 text-amber-600">
+              <span v-if="item.types?.includes('Evaluasi')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style="background: #FFFAE6; color: #D9BA40;">
                 <HelpCircle class="w-3.5 h-3.5" /> Evaluasi
               </span>
             </div>
@@ -247,15 +251,15 @@ const resetFilters = () => {
             <!-- CTA -->
             <button
               @click="emit('openDetail', item)"
-              class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-white font-bold text-sm transition active:scale-95 cursor-pointer shadow-md shrink-0"
-              style="background: linear-gradient(135deg,#FF7315,#e86105); box-shadow: 0 4px 14px rgba(255,115,21,0.30);"
+              class="btn-tactile-orange px-6 py-2.5 font-extrabold text-xs flex items-center gap-2 cursor-pointer shrink-0"
             >
-              Lihat Materi
-              <ArrowRight class="w-4 h-4" />
+              <span>Lihat Materi</span>
+              <ArrowRight class="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </div>
     </section>
+    </div>
   </div>
 </template>

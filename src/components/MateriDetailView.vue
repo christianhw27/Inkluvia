@@ -135,9 +135,9 @@ const emit = defineEmits(['back', 'start'])
           <div class="pt-4">
             <button
               @click="emit('start')"
-              class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-[#FF7315] hover:bg-[#E86105] text-white font-bold text-sm shadow-lg shadow-[#FF7315]/25 transition active:scale-95 cursor-pointer"
+              class="w-full sm:w-auto btn-tactile-orange px-8 py-3.5 font-extrabold text-sm inline-flex items-center justify-center gap-2.5 cursor-pointer"
             >
-              Mulai Petualangan
+              <span>Mulai Petualangan</span>
               <ArrowRight class="w-4 h-4" />
             </button>
           </div>

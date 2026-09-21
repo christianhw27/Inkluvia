@@ -159,9 +159,9 @@ const handleContinue = () => {
       <div class="pt-4">
         <button
           @click="handleContinue"
-          class="inline-flex items-center gap-2.5 px-10 py-3 rounded-full bg-[#FF7315] hover:bg-[#E86105] text-white font-bold text-sm shadow-lg shadow-[#FF7315]/25 transition active:scale-95 cursor-pointer"
+          class="btn-tactile-orange px-10 py-3.5 font-extrabold text-sm inline-flex items-center gap-2.5 cursor-pointer"
         >
-          Lanjutkan
+          <span>Lanjutkan</span>
           <ArrowRight class="w-4 h-4" />
         </button>
       </div>

@@ -5,7 +5,8 @@ import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle2, ChevronDow
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
-  initialTab: { type: String, default: 'login' }
+  initialTab: { type: String, default: 'login' },
+  noticeMessage: { type: String, default: '' }
 })
 
 const emit = defineEmits(['close', 'authenticated'])
@@ -156,6 +157,20 @@ const handleRegister = async () => {
             >
               Daftar
             </button>
+          </div>
+        </div>
+
+        <!-- Middleware Access Notice -->
+        <div
+          v-if="noticeMessage"
+          class="mx-8 mt-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5 shadow-xs"
+        >
+          <div class="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 text-amber-600 mt-0.5">
+            <Lock class="w-3.5 h-3.5" />
+          </div>
+          <div class="flex-1 text-left">
+            <span class="block font-bold text-amber-800 text-[10px] uppercase tracking-wider mb-0.5">Akses Terbatas</span>
+            <p class="leading-relaxed font-medium text-amber-950">{{ noticeMessage }}</p>
           </div>
         </div>
 
