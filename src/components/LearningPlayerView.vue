@@ -32,7 +32,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['back', 'finish'])
+const emit = defineEmits(['back', 'finish', 'open-settings'])
 
 // Active Mode State
 const currentMode = ref(props.initialMode || 'standard')
@@ -285,15 +285,18 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
         </span>
       </div>
 
-      <!-- User Chip -->
+      <!-- User Chip & Settings Quick Trigger -->
       <div class="flex items-center gap-2 pl-3 border-l border-slate-100 shrink-0">
         <span class="text-xs font-bold text-slate-600 hidden sm:block">Hai, {{ studentName }}!</span>
-        <div
-          class="w-9 h-9 rounded-full border-2 border-[#3DA5FF] overflow-hidden flex items-center justify-center text-base"
+        <button
+          type="button"
+          @click="emit('open-settings', 'profile')"
+          title="Buka Pengaturan & Profil"
+          class="relative w-9 h-9 rounded-full border-2 border-[#3DA5FF] overflow-hidden flex items-center justify-center text-base hover:scale-105 active:scale-95 transition cursor-pointer shadow-sm focus:outline-none ring-2 ring-transparent hover:ring-[#3DA5FF]/40"
           style="background: linear-gradient(135deg,#EAF3FD,#c3dff7);"
         >
           {{ currentUser?.avatar || '👧' }}
-        </div>
+        </button>
       </div>
     </div>
 

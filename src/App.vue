@@ -38,6 +38,7 @@ import LearningPlayerView from './components/LearningPlayerView.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 import AuthView from './components/AuthView.vue'
 import PricingView from './components/PricingView.vue'
+import SettingsModal from './components/SettingsModal.vue'
 import { materiList, selectedMateri } from './lib/materiService'
 import {
   currentUser,
@@ -182,6 +183,15 @@ const chosenMode = ref('standard')
 const authTab = ref('login')
 const authNoticeMessage = ref('')
 const showUserDropdown = ref(false)
+
+// Settings Modal state
+const showSettingsModal = ref(false)
+const settingsInitialTab = ref('profile')
+const openSettings = (tab = 'profile') => {
+  settingsInitialTab.value = tab
+  showSettingsModal.value = true
+  showUserDropdown.value = false
+}
 
 // Pending navigation state (intended destination saved when intercepted by middleware)
 const intendedNav = ref(null)
@@ -422,54 +432,40 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </button>
           </div>
 
-          <!-- LOGGED IN — User Profile Dropdown -->
+          <!-- LOGGED IN — User Circular Profile Avatar & Dropdown -->
           <div v-else class="relative shrink-0" ref="dropdownRef">
             <button
               @click="showUserDropdown = !showUserDropdown"
-              class="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full border transition cursor-pointer"
-              :class="isAdmin ? 'bg-orange-50 border-[#FF7315]/30 hover:bg-orange-100' : 'bg-slate-100 border-slate-200 hover:bg-slate-200'"
+              class="relative w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-md border-2 border-white ring-2 cursor-pointer focus:outline-none"
+              :class="isAdmin ? 'ring-[#FF7315] bg-gradient-to-br from-[#FF7315] to-[#e86105]' : 'ring-[#3DA5FF] bg-gradient-to-br from-[#3DA5FF] to-[#0F3261]'"
+              :title="currentUser?.name ? `${currentUser.name} (${currentUser.role || 'User'})` : 'Profil Akun'"
             >
-              <!-- Avatar -->
-              <div
-                class="w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-inner"
-                :class="isAdmin ? 'bg-gradient-to-br from-[#FF7315] to-[#e86105]' : 'bg-gradient-to-br from-[#3DA5FF] to-[#0F3261]'"
-              >
-                {{ currentUser?.avatar || '👤' }}
-              </div>
-              <!-- Name & Role -->
-              <div class="hidden sm:block text-left leading-tight">
-                <span class="block text-xs font-bold text-[#0F3261] truncate max-w-[100px]">
-                  {{ currentUser?.name }}
-                </span>
-                <span
-                  :class="[
-                    'block text-[10px] font-bold',
-                    isAdmin ? 'text-[#FF7315]' : 'text-[#3587CE]'
-                  ]"
-                >
-                  {{ isAdmin ? '🛡️ Administrator' : 'Pengguna' }}
-                </span>
-              </div>
-              <ChevronDown
-                :class="['w-3.5 h-3.5 text-slate-400 transition-transform duration-200', showUserDropdown ? 'rotate-180' : '']"
-              />
+              <span class="select-none leading-none">{{ currentUser?.avatar || '👧' }}</span>
+              <!-- Online / Role Status Indicator Dot -->
+              <span
+                class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
+                :class="isAdmin ? 'bg-[#FF7315]' : 'bg-emerald-500'"
+              ></span>
             </button>
 
             <!-- Dropdown Panel -->
             <Transition name="dropdown">
               <div
                 v-if="showUserDropdown"
-                class="absolute right-0 top-full mt-2 w-60 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden"
+                class="absolute right-0 top-full mt-2 w-64 bg-white rounded-3xl border border-slate-100 shadow-2xl z-50 overflow-hidden animate-slide-up"
               >
                 <!-- User Info Header -->
                 <div class="px-4 py-3.5 bg-gradient-to-r from-[#F4F8FD] to-white border-b border-slate-100">
                   <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3DA5FF] to-[#0F3261] flex items-center justify-center text-lg shadow">
-                      {{ currentUser?.avatar || '👤' }}
+                    <div
+                      class="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm border border-white shrink-0"
+                      :class="isAdmin ? 'bg-gradient-to-br from-[#FF7315] to-[#e86105]' : 'bg-gradient-to-br from-[#3DA5FF] to-[#0F3261]'"
+                    >
+                      {{ currentUser?.avatar || '👧' }}
                     </div>
-                    <div>
-                      <p class="text-sm font-bold text-[#0F3261] truncate max-w-[150px]">{{ currentUser?.name }}</p>
-                      <p class="text-[11px] text-slate-400 truncate max-w-[150px]">{{ currentUser?.email }}</p>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-bold text-[#0F3261] truncate">{{ currentUser?.name }}</p>
+                      <p class="text-[11px] text-slate-400 truncate">{{ currentUser?.email }}</p>
                       <span
                         :class="[
                           'inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold',
@@ -478,32 +474,57 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                             : 'bg-blue-100 text-[#3587CE]'
                         ]"
                       >
-                        {{ currentUser?.role === 'admin' ? 'Administrator' : 'Pengguna' }}
+                        {{ currentUser?.role === 'admin' ? '🛡️ Administrator' : '🎓 Siswa Pelajar' }}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <!-- Menu Items -->
-                <div class="p-2 space-y-0.5">
+                <div class="p-2 space-y-1">
                   <!-- Admin Panel — hanya tampil jika admin -->
                   <button
                     v-if="isAdmin"
-                    @click="navigateTo('admin')"
-                    class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition"
+                    @click="navigateTo('admin'); showUserDropdown = false"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition"
                     style="background: linear-gradient(135deg,#FF7315,#e86105); box-shadow: 0 3px 10px rgba(255,115,21,0.30);"
                   >
-                    <LayoutDashboard class="w-4 h-4" />
-                    Dashboard Admin
+                    <LayoutDashboard class="w-4 h-4 shrink-0" />
+                    <span>Dashboard Admin</span>
                     <span class="ml-auto text-[10px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">CMS</span>
                   </button>
 
                   <button
                     @click="navigateTo('materi'); showUserDropdown = false"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#3587CE] transition cursor-pointer"
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#3587CE] transition cursor-pointer"
                   >
-                    <GraduationCap class="w-4 h-4 text-[#3587CE]" />
-                    Jelajahi Materi
+                    <GraduationCap class="w-4 h-4 text-[#3587CE] shrink-0" />
+                    <span>Jelajahi Materi</span>
+                  </button>
+
+                  <!-- Pengaturan (Profile, Theme, Accessibility) -->
+                  <button
+                    @click="openSettings('profile')"
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#0F3261] transition cursor-pointer"
+                  >
+                    <Settings class="w-4 h-4 text-slate-500 shrink-0" />
+                    <span>Pengaturan Profil</span>
+                  </button>
+
+                  <button
+                    @click="openSettings('theme')"
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer"
+                  >
+                    <span class="text-sm shrink-0">🎨</span>
+                    <span>Tema Tampilan</span>
+                  </button>
+
+                  <button
+                    @click="openSettings('accessibility')"
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer"
+                  >
+                    <span class="text-sm shrink-0">👓</span>
+                    <span>Aksesibilitas</span>
                   </button>
                 </div>
 
@@ -511,10 +532,10 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 <div class="p-2 border-t border-slate-100">
                   <button
                     @click="handleLogout"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                   >
-                    <LogOut class="w-4 h-4" />
-                    Keluar
+                    <LogOut class="w-4 h-4 shrink-0" />
+                    <span>Keluar</span>
                   </button>
                 </div>
               </div>
@@ -1381,6 +1402,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         :initial-mode="chosenMode"
         @back="navigateTo('mode-select')"
         @finish="navigateTo('materi')"
+        @open-settings="openSettings"
       />
     </main>
 
@@ -1528,6 +1550,13 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         </div>
       </div>
     </footer>
+
+    <!-- Settings & Preferences Modal -->
+    <SettingsModal
+      :is-open="showSettingsModal"
+      :initial-tab="settingsInitialTab"
+      @close="showSettingsModal = false"
+    />
   </div>
 </template>
 

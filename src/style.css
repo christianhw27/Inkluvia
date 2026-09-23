@@ -185,3 +185,57 @@ body {
 ::-webkit-scrollbar-track { background: #F0F7FF; }
 ::-webkit-scrollbar-thumb { background: #3DA5FF; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #3587CE; }
+
+/* ============================================================
+   THEME STYLES & PREFERENCES
+   ============================================================ */
+/* Soft / Warm Sepia Theme (Eye comfort) */
+html.theme-soft {
+  filter: sepia(0.2) saturate(0.92) brightness(0.98);
+}
+
+/* Dark Theme */
+html.theme-dark {
+  filter: invert(0.92) hue-rotate(180deg);
+  background-color: #0b1329;
+}
+html.theme-dark img,
+html.theme-dark video,
+html.theme-dark iframe,
+html.theme-dark [role="img"],
+html.theme-dark .no-theme-invert {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* High Contrast Theme */
+html.theme-contrast {
+  filter: contrast(1.28) saturate(1.15);
+}
+
+/* ============================================================
+   ACCESSIBILITY EXTENSIONS
+   ============================================================ */
+/* Dyslexic Font Mode */
+html.font-dyslexic {
+  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif !important;
+  letter-spacing: 0.04em;
+  word-spacing: 0.08em;
+}
+
+/* Font Sizing */
+html.font-size-lg {
+  font-size: 108%;
+}
+html.font-size-xl {
+  font-size: 118%;
+}
+
+/* Reduced Motion Mode */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
+}
+

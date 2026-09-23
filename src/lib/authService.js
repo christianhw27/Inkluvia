@@ -357,5 +357,58 @@ export function quickLogin(role = 'user') {
   return currentUser.value
 }
 
+/**
+ * Memperbarui data profil pengguna aktif (nama dan avatar)
+ * dan memperbarui token JWT di sesi lokal
+ */
+export async function updateUserProfile({ name, avatar }) {
+  if (!currentUser.value) return null
+
+  if (name !== undefined && name.trim()) {
+    currentUser.value.name = name.trim()
+  }
+  if (avatar !== undefined) {
+    currentUser.value.avatar = avatar
+  }
+
+  // Generate token JWT baru dengan profil yang telah diperbarui
+  const token = signJWT({
+    id: currentUser.value.id || currentUser.value.email,
+    name: currentUser.value.name,
+    email: currentUser.value.email,
+    role: currentUser.value.role || 'user',
+    avatar: currentUser.value.avatar
+  })
+
+  currentUser.value.token = token
+  saveUserSession(currentUser.value, token)
+
+  // Sync demo accounts jika cocok
+  const demoMatch = DEMO_ACCOUNTS.find(
+    a => a.email.toLowerCase() === (currentUser.value.email || '').toLowerCase()
+  )
+  if (demoMatch) {
+    if (name !== undefined && name.trim()) demoMatch.name = name.trim()
+    if (avatar !== undefined) demoMatch.avatar = avatar
+  }
+
+  // Jika Supabase aktif, perbarui metadata di Supabase
+  if (isSupabaseConfigured && currentUser.value.isSupabase) {
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          full_name: currentUser.value.name,
+          avatar: currentUser.value.avatar
+        }
+      })
+    } catch (e) {
+      console.warn('Supabase profile metadata update failed (non-critical):', e)
+    }
+  }
+
+  return currentUser.value
+}
+
 // Re-export JWT utilities for inspection / API client usage
 export { signJWT, verifyJWT, getStoredToken, JWT_STORAGE_KEY }
+
