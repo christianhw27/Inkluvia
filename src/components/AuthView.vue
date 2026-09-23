@@ -357,7 +357,7 @@ const fillDemo = (demoEmail, demoPass) => {
                 class="w-full flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 transition text-left cursor-pointer group"
               >
                 <div>
-                  <p class="text-xs font-bold text-[#0F3261] group-hover:text-[#3587CE]">👤 Akun Pengguna (Siswa/Guru)</p>
+                  <p class="text-xs font-bold text-[#0F3261] group-hover:text-[#3587CE]">👤 Akun Pengguna</p>
                   <p class="text-[11px] text-slate-500 font-mono">user@inkluvia.id &bull; user123</p>
                 </div>
                 <span class="text-[10px] font-bold text-[#3587CE] bg-blue-100 px-2 py-0.5 rounded-full">Pilih</span>
@@ -434,7 +434,7 @@ const fillDemo = (demoEmail, demoPass) => {
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                 ]"
               >
-                👤 Pengguna (Siswa/Guru)
+                👤 Pengguna
               </button>
               <button
                 type="button"

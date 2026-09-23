@@ -2,7 +2,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Play,
   Droplets,
   Wind,
   Cloud,
@@ -22,7 +21,8 @@ const emit = defineEmits(['back', 'start'])
 </script>
 
 <template>
-  <div class="space-y-6 max-w-6xl mx-auto py-2">
+  <div class="w-full flex flex-col flex-1 pt-4 sm:pt-6 pb-12 px-4 sm:px-6 lg:px-10 space-y-4 sm:space-y-5">
+    <div class="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-5">
     <!-- Tombol Kembali -->
     <div>
       <button
@@ -37,22 +37,17 @@ const emit = defineEmits(['back', 'start'])
     <!-- Main Card Detail Container -->
     <div class="bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-slate-100/90 shadow-sm">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-        <!-- Sisi Kiri: Video / Image Preview with Play Overlay -->
+        <!-- Sisi Kiri: Image Preview -->
         <div class="lg:col-span-5 flex justify-center">
-          <div class="relative w-full max-w-md aspect-4/3 rounded-3xl overflow-hidden shadow-md border border-slate-100 group">
+          <div
+            @click="emit('start')"
+            class="relative w-full max-w-md aspect-4/3 rounded-3xl overflow-hidden shadow-md border border-slate-100 group cursor-pointer"
+          >
             <img
               :src="materi.image || '/es_batu_card.jpg'"
               :alt="materi.title"
               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
-            <div class="absolute inset-0 bg-slate-950/20 group-hover:bg-slate-950/30 transition-colors flex items-center justify-center">
-              <button
-                @click="emit('start')"
-                class="w-16 h-16 rounded-full bg-slate-900/80 hover:bg-[#FF7315] text-white flex items-center justify-center pl-1 shadow-xl shadow-slate-950/30 group-hover:scale-110 transition-all duration-300 cursor-pointer"
-              >
-                <Play class="w-7 h-7 fill-white" />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -84,22 +79,13 @@ const emit = defineEmits(['back', 'start'])
             </h2>
 
             <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
-              <!-- Item 1: Mencair -->
-              <div class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F9FD] border border-blue-100/80 text-xs font-semibold text-[#0F3261]">
-                <Droplets class="w-4 h-4 text-[#3DA5FF]" />
-                Mencair
-              </div>
-
-              <!-- Item 2: Menguap -->
-              <div class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F9FD] border border-blue-100/80 text-xs font-semibold text-[#0F3261]">
-                <Wind class="w-4 h-4 text-[#3DA5FF]" />
-                Menguap
-              </div>
-
-              <!-- Item 3: Mengembun -->
-              <div class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F9FD] border border-blue-100/80 text-xs font-semibold text-[#0F3261]">
-                <Cloud class="w-4 h-4 text-[#3DA5FF]" />
-                Mengembun
+              <div
+                v-for="(lp, idx) in (materi.learningPoints || [{ title: 'Mencair' }, { title: 'Menguap' }, { title: 'Mengembun' }])"
+                :key="lp.id || idx"
+                class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#F4F9FD] border border-blue-100/80 text-xs font-semibold text-[#0F3261]"
+              >
+                <Sparkles class="w-4 h-4 text-[#3DA5FF]" />
+                <span>{{ typeof lp === 'string' ? lp : lp.title }}</span>
               </div>
             </div>
           </div>
@@ -145,4 +131,5 @@ const emit = defineEmits(['back', 'start'])
       </div>
     </div>
   </div>
+</div>
 </template>

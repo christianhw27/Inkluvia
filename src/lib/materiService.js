@@ -16,112 +16,70 @@ const initialMateri = [
     types: ['Video', 'Interaktif', 'Worksheet'],
     duration: '± 4 menit',
     activityType: 'Video + Aktivitas',
-    learningOptions: 'Standard & Focus Mode',
+    learningOptions: '4 Mode Belajar (Standar, Slow, High Contrast, Focus)',
     learningPoints: [
-      { id: 'lp-1', title: 'Mencair', iconType: 'droplet' },
-      { id: 'lp-2', title: 'Menguap', iconType: 'wind' },
-      { id: 'lp-3', title: 'Mengembun', iconType: 'cloud' }
+      { id: 'lp-1', title: 'Mencair' },
+      { id: 'lp-2', title: 'Menguap' },
+      { id: 'lp-3', title: 'Mengembun' }
     ],
-    standardConfig: {
-      title: 'Standard Mode',
-      subtitle: 'Visual, animasi, dan narasi lengkap',
-      features: [
-        'Visual, animasi, dan narasi',
-        'untuk pengalaman belajar yang lebih lengkap.'
-      ]
+    standardContent: {
+      title: 'Petualangan Si Es Batu (Standar)',
+      text: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud dari padat, cair, hingga gas!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
     },
-    focusConfig: {
-      title: 'Focus Mode',
-      subtitle: 'Tampilan lebih tenang dengan kontras jelas',
-      features: [
-        'Tampilan lebih sederhana',
-        'Gerakan lebih lambat',
-        'Distraksi lebih sedikit',
-        'Kontras lebih jelas'
-      ]
+    slowContent: {
+      title: 'Petualangan Si Es Batu (Slow)',
+      text: 'Es batu dipanaskan secara perlahan... berubah menjadi air cair, lalu menguap menjadi gas di udara.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
     },
-    steps: [
-      {
-        id: 'step-1',
-        number: 1,
-        title: 'Kenalan dengan Es Batu',
-        status: 'completed',
-        standardContent: {
-          title: 'Kenalan dengan Es Batu',
-          text: 'Es batu adalah air dalam wujud padat. Es terbentuk ketika suhu air turun di bawah 0°C.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    highContrastContent: {
+      title: 'PERUBAHAN WUJUD BENDA',
+      text: 'ES BATU (PADAT) -> AIR (CAIR) -> UAP (GAS). PROSES MENCAIR, MENGUAP, DAN MENGEMBUN.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    },
+    focusContent: {
+      title: 'Es Batu = Perubahan Wujud',
+      text: 'Es batu (Padat) → Air (Cair) → Uap (Gas). Kamu hebat sudah belajar hari ini!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    },
+    assessment: {
+      title: 'Asesmen Pemahaman Materi Es Batu',
+      questions: [
+        {
+          id: 'q-1',
+          questionText: 'Apa yang terjadi pada es batu padat ketika dipanaskan?',
+          options: [
+            'Mencair menjadi air cair',
+            'Membeku menjadi es batu keras',
+            'Menjadi batu besar',
+            'Tidak terjadi perubahan'
+          ],
+          correctOptionIndex: 0
         },
-        focusContent: {
-          title: 'Es Batu = Air Padat',
-          text: 'Es adalah air yang beku dan padat karena suhunya sangat dingin.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-        }
-      },
-      {
-        id: 'step-2',
-        number: 2,
-        title: 'Es Batu Mencair',
-        status: 'completed',
-        standardContent: {
-          title: 'Es Batu Mencair',
-          text: 'Saat terkena panas sinar matahari, es batu menyerap kalor dan berubah menjadi air cair. Proses ini disebut mencair.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+        {
+          id: 'q-2',
+          questionText: 'Proses perubahan wujud air cair menjadi uap gas disebut...',
+          options: [
+            'Mencair',
+            'Menguap',
+            'Mengembun',
+            'Membeku'
+          ],
+          correctOptionIndex: 1
         },
-        focusContent: {
-          title: 'Mencair: Padat ke Cair',
-          text: 'Kena panas → Es batu jadi air. Ini namanya mencair.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+        {
+          id: 'q-3',
+          questionText: 'Ketika uap air mengenai udara dingin, uap berubah menjadi titik air. Proses ini disebut...',
+          options: [
+            'Mengembun',
+            'Menguap',
+            'Mencair',
+            'Menyublim'
+          ],
+          correctOptionIndex: 0
         }
-      },
-      {
-        id: 'step-3',
-        number: 3,
-        title: 'Air Menguap',
-        status: 'active',
-        standardContent: {
-          title: 'Air Menguap',
-          text: 'Ketika dipanaskan, air berubah menjadi uap. Proses ini disebut menguap.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
-        },
-        focusContent: {
-          title: 'Menguap: Air Jadi Uap Gas',
-          text: 'Air dipanaskan → Berubah jadi uap air di udara. Ini disebut menguap.',
-          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
-        }
-      },
-      {
-        id: 'step-4',
-        number: 4,
-        title: 'Uap Mengembun',
-        status: 'locked',
-        standardContent: {
-          title: 'Uap Mengembun',
-          text: 'Saat uap air menyentuh permukaan yang dingin, uap berubah kembali menjadi butiran air. Proses ini disebut mengembun.',
-          videoUrl: ''
-        },
-        focusContent: {
-          title: 'Mengembun: Uap Balik Jadi Air',
-          text: 'Uap kena dingin → Jadi titik-titik air kembali.',
-          videoUrl: ''
-        }
-      },
-      {
-        id: 'step-5',
-        number: 5,
-        title: 'Yuk Ingat Lagi',
-        status: 'locked',
-        standardContent: {
-          title: 'Kuis & Evaluasi Petualangan',
-          text: 'Mari kita ingat kembali: Mencair, Menguap, dan Mengembun!',
-          videoUrl: ''
-        },
-        focusContent: {
-          title: 'Rangkuman Poin Penting',
-          text: 'Es batu (Padat) → Air (Cair) → Uap (Gas). Kamu hebat sudah belajar hari ini!',
-          videoUrl: ''
-        }
-      }
-    ]
+      ]
+    }
   }
 ]
 
@@ -167,7 +125,12 @@ async function loadFromSupabase() {
         steps: typeof row.steps === 'string' ? JSON.parse(row.steps) : (row.steps || []),
         learningPoints: typeof row.learning_points === 'string' ? JSON.parse(row.learning_points) : (row.learningPoints || row.learning_points || []),
         standardConfig: typeof row.standard_config === 'string' ? JSON.parse(row.standard_config) : (row.standardConfig || row.standard_config || {}),
-        focusConfig: typeof row.focus_config === 'string' ? JSON.parse(row.focus_config) : (row.focusConfig || row.focus_config || {})
+        focusConfig: typeof row.focus_config === 'string' ? JSON.parse(row.focus_config) : (row.focusConfig || row.focus_config || {}),
+        standardContent: typeof row.standard_content === 'string' ? JSON.parse(row.standard_content) : (row.standardContent || row.standard_content || {}),
+        slowContent: typeof row.slow_content === 'string' ? JSON.parse(row.slow_content) : (row.slowContent || row.slow_content || {}),
+        highContrastContent: typeof row.high_contrast_content === 'string' ? JSON.parse(row.high_contrast_content) : (row.highContrastContent || row.high_contrast_content || {}),
+        focusContent: typeof row.focus_content === 'string' ? JSON.parse(row.focus_content) : (row.focusContent || row.focus_content || {}),
+        assessment: typeof row.assessment === 'string' ? JSON.parse(row.assessment) : (row.assessment || null)
       }))
       selectedMateri.value = materiList.value[0] || null
       saveToLocalStorage()
@@ -252,6 +215,16 @@ export async function addMateri(newItem) {
           text: newItem.description || 'Mari mulai petualangan belajar kita!',
           videoUrl: ''
         },
+        slowContent: {
+          title: 'Pengenalan Materi (Slow)',
+          text: newItem.description || 'Mari belajar secara bertahap dan santai.',
+          videoUrl: ''
+        },
+        highContrastContent: {
+          title: 'PENGENALAN MATERI',
+          text: (newItem.description || 'MARI MULAI BELAJAR').toUpperCase(),
+          videoUrl: ''
+        },
         focusContent: {
           title: 'Poin Kunci Pengenalan',
           text: newItem.description || 'Mari mulai belajar dengan fokus dan tenang.',
@@ -285,6 +258,11 @@ export async function addMateri(newItem) {
         standard_config: itemWithId.standardConfig,
         focus_config: itemWithId.focusConfig,
         learning_points: itemWithId.learningPoints,
+        standard_content: itemWithId.standardContent,
+        slow_content: itemWithId.slowContent,
+        high_contrast_content: itemWithId.highContrastContent,
+        focus_content: itemWithId.focusContent,
+        assessment: itemWithId.assessment,
         created_at: itemWithId.created_at
       }
       const { error } = await supabase.from('materi').insert([supabaseRow])
@@ -325,7 +303,12 @@ export async function updateMateri(id, updatedFields) {
         steps: updatedFields.steps,
         standard_config: updatedFields.standardConfig,
         focus_config: updatedFields.focusConfig,
-        learning_points: updatedFields.learningPoints
+        learning_points: updatedFields.learningPoints,
+        standard_content: updatedFields.standardContent,
+        slow_content: updatedFields.slowContent,
+        high_contrast_content: updatedFields.highContrastContent,
+        focus_content: updatedFields.focusContent,
+        assessment: updatedFields.assessment
       }
       // Hapus field undefined
       Object.keys(supabaseFields).forEach(

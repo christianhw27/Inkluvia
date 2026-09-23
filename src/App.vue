@@ -37,7 +37,6 @@ import ModeSelectView from './components/ModeSelectView.vue'
 import LearningPlayerView from './components/LearningPlayerView.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 import AuthView from './components/AuthView.vue'
-import GuruView from './components/GuruView.vue'
 import PricingView from './components/PricingView.vue'
 import { materiList, selectedMateri } from './lib/materiService'
 import {
@@ -272,14 +271,14 @@ const navigateTo = (tab) => {
 // Flow Handlers protected by Middleware
 const handleOpenDetail = (item) => {
   const targetItem = item || materiList.value[0]
-  const guard = canAccessRoute('materi-detail')
+  const guard = canAccessRoute('mode-select')
   if (!guard.allowed) {
-    intendedNav.value = { tab: 'materi-detail', item: targetItem }
+    intendedNav.value = { tab: 'mode-select', item: targetItem }
     navigateToAuth(guard.tab || 'login', guard.reason)
     return
   }
   activeMateriItem.value = targetItem
-  currentNav.value = 'materi-detail'
+  currentNav.value = 'mode-select'
 }
 
 const handleStartAdventure = () => {
@@ -319,9 +318,15 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 </script>
 
 <template>
-  <div class="w-full min-h-screen bg-[#F0F7FF] text-slate-800 font-sans flex flex-col overflow-x-hidden">
+  <div class="w-full min-h-screen bg-[#F8FAFD] text-slate-800 font-sans flex flex-col overflow-x-hidden relative" style="background-image: radial-gradient(circle, rgba(15, 50, 97, 0.07) 1.2px, transparent 1.2px); background-size: 28px 28px;">
+    <!-- Global Softened Ambient Glow (On-Scrolling Absolute) -->
+    <div class="absolute top-0 left-0 w-[450px] h-[450px] rounded-full bg-[#FFDC58]/06 blur-3xl pointer-events-none z-0"></div>
+    <div class="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#3DA5FF]/06 blur-3xl pointer-events-none z-0"></div>
+    <div class="absolute top-2/4 left-0 w-[400px] h-[400px] rounded-full bg-[#FF74BC]/06 blur-3xl pointer-events-none z-0"></div>
+    <div class="absolute top-3/4 right-0 w-[400px] h-[400px] rounded-full bg-[#74DC2E]/05 blur-3xl pointer-events-none z-0"></div>
+
     <!-- ==================== HEADER / NAVBAR ==================== -->
-    <header class="shrink-0 z-30 sticky top-0" style="background: rgba(255,255,255,0.82); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 1px solid rgba(61,165,255,0.15); box-shadow: 0 2px 20px rgba(15,50,97,0.08);">
+    <header class="shrink-0 z-30 sticky top-0" style="background: rgba(255,255,255,0.86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 1px solid rgba(61,165,255,0.15); box-shadow: 0 2px 20px rgba(15,50,97,0.08);">
       <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 h-[68px] flex items-center justify-between gap-4">
 
         <!-- Left: Logo + Nav Links -->
@@ -367,17 +372,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             >
               Materi
             </button>
-            <button
-              @click="navigateTo('guru')"
-              :class="[
-                'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer',
-                currentNav === 'guru'
-                  ? 'bg-[#3DA5FF] text-white shadow-sm shadow-[#3DA5FF]/20'
-                  : 'text-slate-600 hover:text-[#3587CE] hover:bg-[#3DA5FF]/8'
-              ]"
-            >
-              Untuk Guru
-            </button>
+
             <button
               @click="navigateTo('harga')"
               :class="[
@@ -689,8 +684,15 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </section>
 
       <!-- ==================== SECTION 1: PILAR NILAI & AKSESIBILITAS ==================== -->
-      <section class="w-full bg-[#F0F7FF] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 relative overflow-hidden border-b border-blue-100/60">
-        <div class="w-full max-w-[1440px] mx-auto space-y-12">
+      <section class="w-full bg-[#F4F9FF] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 relative overflow-hidden border-b border-blue-100/60" style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;">
+        <!-- Background Blobs & Section Doodles (On Scrolling) -->
+        <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#FFDC58]/15 blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-0 -left-20 w-80 h-80 rounded-full bg-[#3DA5FF]/12 blur-3xl pointer-events-none"></div>
+        <div class="absolute top-10 left-8 text-2xl text-[#FFDC58] animate-bounce-subtle pointer-events-none hidden sm:block">⭐</div>
+        <div class="absolute bottom-12 right-12 text-xl text-[#FF74BC] pointer-events-none hidden sm:block">✨</div>
+        <div class="absolute top-1/2 left-4 w-6 h-6 rounded-full border-4 border-[#3DA5FF]/30 pointer-events-none hidden sm:block"></div>
+
+        <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
           
           <!-- Section Header -->
           <div class="text-center max-w-3xl mx-auto space-y-3">
@@ -797,7 +799,12 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </section>
 
       <!-- ==================== SECTION 2: PRATINJAU MATERI & AKTIVITAS ==================== -->
-      <section class="w-full bg-white px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-slate-100">
+      <section class="w-full bg-[#FFFDF9] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-orange-100/60 relative overflow-hidden">
+        <!-- Section Background Blobs & Doodles (On Scrolling) -->
+        <div class="absolute top-10 right-10 w-96 h-96 rounded-full bg-[#FF7315]/08 blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#FFDC58]/10 blur-3xl pointer-events-none"></div>
+        <div class="absolute top-16 right-8 text-xl text-[#FF7315] opacity-75 pointer-events-none hidden sm:block">🔸</div>
+        <div class="absolute bottom-16 left-8 text-2xl opacity-40 pointer-events-none hidden sm:block">📖</div>
         <div class="w-full max-w-[1440px] mx-auto space-y-10">
           
           <!-- Section Header -->
@@ -1120,14 +1127,14 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           <!-- Dual-Cards Split Layout -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            <!-- Card A: Untuk Guru & Pendidik -->
+            <!-- Card A: Lembar Kerja & Aktivitas -->
             <div class="bg-gradient-to-br from-[#F4F9FF] to-white rounded-3xl p-8 sm:p-10 border-2 border-blue-100 shadow-md flex flex-col justify-between space-y-8 relative group">
               <div class="space-y-5">
                 <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-[#3587CE]">
-                  UNTUK GURU & PENDIDIK INKLUSI
+                  LEMBAR KERJA & AKTIVITAS
                 </span>
                 <h3 class="text-xl sm:text-2xl font-extrabold text-[#0F3261]">
-                  Fasilitasi Kebutuhan Belajar Siswa di Kelas
+                  Materi Interaktif & Lembar Kerja Cetak
                 </h3>
 
                 <ul class="space-y-3.5 text-xs sm:text-sm text-slate-600 font-medium">
@@ -1137,31 +1144,31 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   </li>
                   <li class="flex items-start gap-3">
                     <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                    <span>Panduan penerapan materi yang selaras dengan Kurikulum Merdeka.</span>
+                    <span>Panduan penerapan materi pembelajaran yang fleksibel.</span>
                   </li>
                   <li class="flex items-start gap-3">
                     <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                    <span>Opsi penyesuaian materi untuk murid dengan kebutuhan individual.</span>
+                    <span>Opsi penyesuaian materi untuk kebutuhan belajar individual.</span>
                   </li>
                 </ul>
               </div>
 
               <div>
                 <button
-                  @click="navigateTo('guru')"
+                  @click="navigateTo('materi')"
                   class="btn-tactile-orange w-full py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
-                  <span>Kunjungi Portal Guru</span>
+                  <span>Jelajahi Katalog Materi</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            <!-- Card B: Untuk Orang Tua -->
+            <!-- Card B: Untuk Orang Tua & Pendamping -->
             <div class="bg-gradient-to-br from-[#FFF8F3] to-white rounded-3xl p-8 sm:p-10 border-2 border-orange-100 shadow-md flex flex-col justify-between space-y-8 relative group">
               <div class="space-y-5">
                 <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-orange-100 text-[#FF7315]">
-                  UNTUK ORANG TUA DI RUMAH
+                  UNTUK ORANG TUA & PENDAMPING
                 </span>
                 <h3 class="text-xl sm:text-2xl font-extrabold text-[#0F3261]">
                   Dampingi Tumbuh Kembang Tanpa Bingung
@@ -1185,10 +1192,10 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
               <div>
                 <button
-                  @click="navigateTo('guru')"
+                  @click="navigateTo('materi')"
                   class="btn-tactile-white w-full py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-2xs border-2 border-[#0F3261] text-[#0F3261]"
                 >
-                  <span>Baca Panduan Orang Tua</span>
+                  <span>Mulai Belajar</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>
               </div>
@@ -1386,10 +1393,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       />
     </main>
 
-    <!-- ==================== VIEW: UNTUK GURU ==================== -->
-    <main v-else-if="currentNav === 'guru' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-6 flex-1">
-      <GuruView />
-    </main>
+
 
     <!-- ==================== VIEW: PRICING (PAKET HARGA) ==================== -->
     <main v-else-if="currentNav === 'harga'" class="w-full flex-1 flex flex-col">
@@ -1479,7 +1483,6 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <ul class="space-y-2 text-sm text-slate-300 font-medium">
               <li><button @click="navigateTo('beranda')" class="hover:text-[#3DA5FF] transition cursor-pointer">Beranda</button></li>
               <li><button @click="navigateTo('materi')" class="hover:text-[#3DA5FF] transition cursor-pointer">Katalog Materi</button></li>
-              <li><button @click="navigateTo('guru')" class="hover:text-[#3DA5FF] transition cursor-pointer">Untuk Guru & Pengajar</button></li>
               <li><button @click="navigateTo('harga')" class="hover:text-[#FF7315] font-semibold transition cursor-pointer">Paket Langganan (Harga)</button></li>
               <li v-if="isAdmin"><button @click="navigateTo('admin')" class="font-bold transition cursor-pointer" style="color: #FF7315;">Dashboard Admin (CMS)</button></li>
             </ul>

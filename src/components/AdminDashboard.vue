@@ -4,13 +4,13 @@ import {
   materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri
 } from '../lib/materiService'
 import { currentUser, isAdmin, logoutUser } from '../lib/authService'
-import { uploadVideo, isCloudinaryConfigured } from '../lib/cloudinary'
+import { uploadVideo, uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
 import {
   LayoutDashboard, BookOpen, Video, Settings, LogOut, Plus, Trash2, Edit3, Eye,
   X, Sun, CheckCircle2, UploadCloud, ShieldAlert, Search, Bell, ChevronRight,
   FileVideo, CloudUpload, RefreshCw, Sparkles, TrendingUp, Users, Clock,
   ArrowUpRight, MoreVertical, Filter, Download, AlertCircle, Menu, ChevronDown,
-  ArrowLeft, Save, ImagePlus, ListVideo, Tag, AlignLeft, Layers
+  ArrowLeft, Save, ImagePlus, ListVideo, Tag, AlignLeft, Layers, HelpCircle
 } from '@lucide/vue'
 
 const emit = defineEmits(['previewMateri', 'backToApp', 'openAuth'])
@@ -34,6 +34,9 @@ const uploadProgress = ref(0)
 const uploadTargetKey = ref(null)
 const dragOverKey = ref(null)
 
+const isUploadingImage = ref(false)
+const imageUploadProgress = ref(0)
+
 // Form data
 const currentForm = ref(getEmptyForm())
 
@@ -44,26 +47,65 @@ function getEmptyForm() {
     jenjang: 'SD',
     mataPelajaran: 'IPAS',
     level: 'IPAS • Kelas IV • Fase B',
-    description: '',
+    description: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud!',
     badge: 'Gratis',
     duration: '± 5 menit',
     activityType: 'Video + Aktivitas',
-    learningOptions: 'Standard & Focus Mode',
+    learningOptions: '4 Mode Belajar (Standar, Slow, High Contrast, Focus)',
     image: '/es_batu_card.jpg',
     types: ['Video', 'Interaktif'],
-    standardConfig: {
-      title: 'Standard Mode',
-      features: ['Visual, animasi, dan narasi', 'untuk pengalaman belajar yang lebih lengkap.']
+    learningPoints: [
+      { id: 'lp-1', title: 'Mencair' },
+      { id: 'lp-2', title: 'Menguap' },
+      { id: 'lp-3', title: 'Mengembun' }
+    ],
+    standardContent: {
+      title: 'Petualangan Si Es Batu (Standar)',
+      text: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud dari padat, cair, hingga gas!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
     },
-    focusConfig: {
-      title: 'Focus Mode',
-      features: ['Tampilan lebih sederhana', 'Gerakan lebih lambat', 'Distraksi lebih sedikit', 'Kontras lebih jelas']
+    slowContent: {
+      title: 'Petualangan Si Es Batu (Slow)',
+      text: 'Es batu dipanaskan secara perlahan... berubah menjadi air cair, lalu menguap menjadi gas di udara.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
     },
-    steps: [{
-      id: 'step-1', number: 1, title: 'Pengenalan Materi',
-      standardContent: { title: 'Pengenalan Materi', text: '', videoUrl: '' },
-      focusContent: { title: 'Poin Kunci', text: '', videoUrl: '' }
-    }]
+    highContrastContent: {
+      title: 'PERUBAHAN WUJUD BENDA',
+      text: 'ES BATU (PADAT) -> AIR (CAIR) -> UAP (GAS). PROSES MENCAIR, MENGUAP, DAN MENGEMBUN.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    },
+    focusContent: {
+      title: 'Es Batu = Perubahan Wujud',
+      text: 'Es batu (Padat) → Air (Cair) → Uap (Gas). Kamu hebat sudah belajar hari ini!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    },
+    assessment: {
+      title: 'Asesmen & Kuis Pemahaman',
+      questions: [
+        {
+          id: 'q-1',
+          questionText: 'Apa yang terjadi pada es batu padat ketika dipanaskan?',
+          options: [
+            'Mencair menjadi air cair',
+            'Membeku menjadi es batu keras',
+            'Menjadi batu besar',
+            'Tidak terjadi perubahan'
+          ],
+          correctOptionIndex: 0
+        },
+        {
+          id: 'q-2',
+          questionText: 'Proses perubahan wujud air cair menjadi uap gas disebut...',
+          options: [
+            'Mencair',
+            'Menguap',
+            'Mengembun',
+            'Membeku'
+          ],
+          correctOptionIndex: 1
+        }
+      ]
+    }
   }
 }
 
@@ -77,9 +119,69 @@ const openAddForm = () => {
 
 const openEditForm = (item) => {
   isEditing.value = true
-  currentForm.value = JSON.parse(JSON.stringify(item))
+  const copy = JSON.parse(JSON.stringify(item))
+  if (!copy.learningPoints) {
+    copy.learningPoints = [
+      { id: 'lp-1', title: 'Konsep Utama' },
+      { id: 'lp-2', title: 'Aktivitas Belajar' }
+    ]
+  }
+  if (!copy.standardContent) copy.standardContent = { title: copy.title || '', text: copy.description || '', videoUrl: '' }
+  if (!copy.slowContent) copy.slowContent = { title: `${copy.title || ''} (Slow)`, text: copy.description || '', videoUrl: '' }
+  if (!copy.highContrastContent) copy.highContrastContent = { title: copy.title?.toUpperCase() || '', text: copy.description?.toUpperCase() || '', videoUrl: '' }
+  if (!copy.focusContent) copy.focusContent = { title: copy.title || '', text: copy.description || '', videoUrl: '' }
+  if (!copy.assessment) {
+    copy.assessment = {
+      title: `${copy.title || 'Materi'} - Asesmen Pemahaman`,
+      questions: [
+        {
+          id: 'q-1',
+          questionText: 'Apa poin utama yang dipelajari pada materi ini?',
+          options: ['Opsi Jawaban A', 'Opsi Jawaban B', 'Opsi Jawaban C', 'Opsi Jawaban D'],
+          correctOptionIndex: 0
+        }
+      ]
+    }
+  }
+
+  currentForm.value = copy
   activeFormTab.value = 'general'
   showForm.value = true
+}
+
+const addLearningPoint = () => {
+  if (!currentForm.value.learningPoints) currentForm.value.learningPoints = []
+  currentForm.value.learningPoints.push({
+    id: `lp-${Date.now()}`,
+    title: ''
+  })
+}
+
+const removeLearningPoint = (idx) => {
+  if (currentForm.value.learningPoints) {
+    currentForm.value.learningPoints.splice(idx, 1)
+  }
+}
+
+const addQuestion = () => {
+  if (!currentForm.value.assessment) {
+    currentForm.value.assessment = { title: 'Asesmen & Kuis Pemahaman', questions: [] }
+  }
+  if (!currentForm.value.assessment.questions) {
+    currentForm.value.assessment.questions = []
+  }
+  currentForm.value.assessment.questions.push({
+    id: `q-${Date.now()}`,
+    questionText: '',
+    options: ['', '', '', ''],
+    correctOptionIndex: 0
+  })
+}
+
+const removeQuestion = (idx) => {
+  if (currentForm.value.assessment?.questions) {
+    currentForm.value.assessment.questions.splice(idx, 1)
+  }
 }
 
 const handleSave = async () => {
@@ -101,63 +203,99 @@ const handleDelete = async (id, title) => {
   }
 }
 
-const addStep = () => {
-  const n = currentForm.value.steps.length + 1
-  currentForm.value.steps.push({
-    id: `step-${Date.now()}`, number: n, title: `Langkah ${n}`,
-    standardContent: { title: `Langkah ${n} (Standard)`, text: '', videoUrl: '' },
-    focusContent: { title: `Langkah ${n} (Fokus)`, text: '', videoUrl: '' }
-  })
-}
-
-const removeStep = (idx) => {
-  if (currentForm.value.steps.length > 1) currentForm.value.steps.splice(idx, 1)
-}
-
-// Video upload
-const doUpload = async (file, stepIdx, mode) => {
-  const key = `step-${stepIdx}-${mode}`
-  uploadTargetKey.value = key
+// Video upload for 4 modes
+const doUpload = async (file, modeKey) => {
+  const modeMap = {
+    standard: 'standardContent',
+    slow: 'slowContent',
+    high_contrast: 'highContrastContent',
+    focus: 'focusContent'
+  }
+  const field = modeMap[modeKey] || 'standardContent'
+  uploadTargetKey.value = modeKey
   uploadProgress.value = 0
+
   if (!isCloudinaryConfigured) {
-    const samples = [
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
-    ]
-    const url = samples[stepIdx % samples.length]
-    if (mode === 'standard') currentForm.value.steps[stepIdx].standardContent.videoUrl = url
-    else currentForm.value.steps[stepIdx].focusContent.videoUrl = url
+    const samples = {
+      standard: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      slow: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+      high_contrast: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+      focus: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    }
+    currentForm.value[field].videoUrl = samples[modeKey] || samples.standard
     uploadTargetKey.value = null
     return
   }
+
   isUploadingVideo.value = true
   try {
-    const res = await uploadVideo(file, (pct) => { uploadProgress.value = pct })
-    if (mode === 'standard') currentForm.value.steps[stepIdx].standardContent.videoUrl = res.secure_url
-    else currentForm.value.steps[stepIdx].focusContent.videoUrl = res.secure_url
-  } catch (err) { alert(`Upload gagal: ${err.message}`) }
-  finally {
+    const rawId = currentForm.value.id || currentForm.value.title || 'new_materi'
+    const cleanSlug = rawId.toString().toLowerCase().replace(/[^a-z0-9]/g, '_')
+    const customPublicId = `inkluvia_${cleanSlug}_${modeKey}`
+    const res = await uploadVideo(file, (pct) => { uploadProgress.value = pct }, customPublicId)
+    currentForm.value[field].videoUrl = res.secure_url
+  } catch (err) {
+    alert(`Upload gagal: ${err.message}`)
+  } finally {
     isUploadingVideo.value = false
     uploadTargetKey.value = null
     uploadProgress.value = 0
   }
 }
-const handleDrop = async (e, idx, mode) => {
-  e.preventDefault(); dragOverKey.value = null
+
+const handleDrop = async (e, modeKey) => {
+  e.preventDefault()
+  dragOverKey.value = null
   const file = e.dataTransfer?.files?.[0]
-  if (file?.type.startsWith('video/')) await doUpload(file, idx, mode)
+  if (file?.type.startsWith('video/')) await doUpload(file, modeKey)
 }
-const handleFileInput = async (e, idx, mode) => {
+
+const handleFileInput = async (e, modeKey) => {
   const file = e.target.files?.[0]
-  if (file) await doUpload(file, idx, mode)
+  if (file) await doUpload(file, modeKey)
+}
+
+// Image upload for thumbnail
+const handleImageUpload = async (file) => {
+  if (!file) return
+  isUploadingImage.value = true
+  imageUploadProgress.value = 0
+  try {
+    const rawId = currentForm.value.id || currentForm.value.title || 'thumb'
+    const cleanSlug = rawId.toString().toLowerCase().replace(/[^a-z0-9]/g, '_')
+    const customPublicId = `thumb_${cleanSlug}`
+    const res = await uploadImage(file, (pct) => { imageUploadProgress.value = pct }, customPublicId)
+    currentForm.value.image = res.secure_url
+  } catch (err) {
+    alert(`Upload gambar gagal: ${err.message}`)
+  } finally {
+    isUploadingImage.value = false
+    imageUploadProgress.value = 0
+  }
+}
+
+const handleImageFileInput = async (e) => {
+  const file = e.target.files?.[0]
+  if (file) await handleImageUpload(file)
+}
+
+const handleImageDrop = async (e) => {
+  e.preventDefault()
+  dragOverKey.value = null
+  const file = e.dataTransfer?.files?.[0]
+  if (file && file.type.startsWith('image/')) await handleImageUpload(file)
 }
 
 // Computed stats
-const totalSteps = computed(() => materiList.value.reduce((a, m) => a + (m.steps?.length || 0), 0))
-const totalVideos = computed(() => materiList.value.reduce((a, m) =>
-  a + (m.steps?.filter(s => s.standardContent?.videoUrl || s.focusContent?.videoUrl).length || 0), 0
-))
+const totalPoinBelajar = computed(() => materiList.value.reduce((a, m) => a + (m.learningPoints?.length || 0), 0))
+const totalVideos = computed(() => materiList.value.reduce((a, m) => {
+  let count = 0
+  if (m.standardContent?.videoUrl) count++
+  if (m.slowContent?.videoUrl) count++
+  if (m.highContrastContent?.videoUrl) count++
+  if (m.focusContent?.videoUrl) count++
+  return a + count
+}, 0))
 
 // Filtered table
 const filteredMateri = computed(() => {
@@ -342,36 +480,42 @@ const navItems = [
             <div class="flex-1 overflow-y-auto p-6">
               <div class="max-w-5xl mx-auto">
 
-                <!-- Tab Pills -->
+                <!-- Tab Pills (6 Tabs: Info Dasar + 4 Modes + Asesmen) -->
                 <div class="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
                   <button
                     v-for="(label, key) in {
                       general: 'Info Dasar',
-                      standard: 'Standard Mode',
+                      standard: 'Standar Mode',
+                      slow: 'Slow Mode',
+                      high_contrast: 'High Contrast Mode',
                       focus: 'Focus Mode',
-                      steps: `Babak Video (${currentForm.steps.length})`
+                      assessment: 'Asesmen & Kuis'
                     }"
                     :key="key"
                     @click="activeFormTab = key"
                     :class="[
-                      'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition cursor-pointer border',
+                      'flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition cursor-pointer border',
                       activeFormTab === key
                         ? key === 'general' ? 'bg-[#0F3261] text-white border-[#0F3261]'
                           : key === 'standard' ? 'bg-[#3587CE] text-white border-[#3587CE]'
+                          : key === 'slow' ? 'bg-purple-600 text-white border-purple-600'
+                          : key === 'high_contrast' ? 'bg-yellow-400 text-slate-950 border-yellow-400 font-black'
                           : key === 'focus' ? 'bg-[#FF7315] text-white border-[#FF7315]'
-                          : 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
                     ]"
                   >
                     <Layers v-if="key === 'general'" class="w-4 h-4" />
                     <Sparkles v-else-if="key === 'standard'" class="w-4 h-4" />
+                    <span v-else-if="key === 'slow'">🐢</span>
+                    <span v-else-if="key === 'high_contrast'">👁️</span>
                     <Sun v-else-if="key === 'focus'" class="w-4 h-4" />
-                    <ListVideo v-else class="w-4 h-4" />
+                    <HelpCircle v-else class="w-4 h-4" />
                     {{ label }}
                   </button>
                 </div>
 
-                <!-- ---- TAB: INFO DASAR ---- -->
+                <!-- ---- TAB 1: INFO DASAR ---- -->
                 <div v-if="activeFormTab === 'general'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <!-- Left column: main fields -->
                   <div class="lg:col-span-2 space-y-5">
@@ -388,7 +532,7 @@ const navItems = [
                         />
                       </div>
                       <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Deskripsi</label>
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Deskripsi Ringkas</label>
                         <textarea
                           v-model="currentForm.description"
                           rows="4"
@@ -437,48 +581,109 @@ const navItems = [
                       </div>
                     </div>
 
-                    <!-- Jenis Media -->
+                    <!-- Apa yang akan kamu pelajari? (Learning Points) -->
                     <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
-                      <h3 class="text-sm font-bold text-[#0F3261] flex items-center gap-2">
-                        <Tag class="w-4 h-4 text-[#3DA5FF]" /> Jenis Media
-                      </h3>
-                      <div class="flex flex-wrap gap-2">
+                      <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-[#0F3261] flex items-center gap-2">
+                          <Sparkles class="w-4 h-4 text-[#FF7315]" /> Apa yang akan kamu pelajari? (Poin Belajar)
+                        </h3>
                         <button
-                          v-for="t in ['Video', 'Interaktif', 'Worksheet', 'Evaluasi', 'Audio']"
-                          :key="t"
                           type="button"
-                          @click="currentForm.types.includes(t) ? (currentForm.types.length > 1 && (currentForm.types = currentForm.types.filter(x => x !== t))) : currentForm.types.push(t)"
-                          :class="[
-                            'px-4 py-2 rounded-xl text-sm font-semibold border-2 transition cursor-pointer flex items-center gap-1.5',
-                            currentForm.types.includes(t)
-                              ? 'bg-[#0F3261] border-[#0F3261] text-white'
-                              : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                          ]"
+                          @click="addLearningPoint"
+                          class="text-xs font-extrabold text-[#3587CE] hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          <CheckCircle2 v-if="currentForm.types.includes(t)" class="w-3.5 h-3.5" />
-                          {{ t }}
+                          + Tambah Poin
                         </button>
+                      </div>
+                      <div class="space-y-2">
+                        <div
+                          v-for="(lp, idx) in currentForm.learningPoints"
+                          :key="lp.id || idx"
+                          class="flex items-center gap-2"
+                        >
+                          <span class="w-6 h-6 rounded-full bg-blue-100 text-[#3587CE] text-xs font-bold flex items-center justify-center shrink-0">
+                            {{ idx + 1 }}
+                          </span>
+                          <input
+                            v-model="lp.title"
+                            placeholder="Judul poin (misal: Mencair, Menguap, Mengembun)..."
+                            class="flex-1 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:border-[#3DA5FF] focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            @click="removeLearningPoint(idx)"
+                            class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            title="Hapus Poin"
+                          >
+                            <X class="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Right column: thumbnail -->
+                  <!-- Right column: thumbnail & summary -->
                   <div class="space-y-4">
                     <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
                       <h3 class="text-sm font-bold text-[#0F3261] flex items-center gap-2">
-                        <ImagePlus class="w-4 h-4 text-[#3DA5FF]" /> Thumbnail
+                        <ImagePlus class="w-4 h-4 text-[#3DA5FF]" /> Thumbnail Gambar
                       </h3>
-                      <!-- Preview -->
-                      <div class="w-full aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+
+                      <!-- Interactive Image Upload Drop Area -->
+                      <div
+                        @dragover.prevent="dragOverKey = 'image'"
+                        @dragleave="dragOverKey = null"
+                        @drop="handleImageDrop"
+                        :class="[
+                          'relative w-full aspect-video rounded-xl overflow-hidden border-2 border-dashed transition group text-center flex items-center justify-center',
+                          dragOverKey === 'image' ? 'border-[#3DA5FF] bg-blue-50' : 'border-slate-200 bg-slate-100 hover:border-[#3DA5FF]'
+                        ]"
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          class="absolute inset-0 opacity-0 cursor-pointer z-10"
+                          @change="handleImageFileInput"
+                        />
                         <img
                           :src="currentForm.image || '/es_batu_card.jpg'"
                           alt="Thumbnail Preview"
                           class="w-full h-full object-cover"
                           @error="$event.target.src = '/es_batu_card.jpg'"
                         />
+                        
+                        <!-- Hover overlay with browse icon -->
+                        <div class="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1 p-3 pointer-events-none">
+                          <UploadCloud class="w-7 h-7 text-[#3DA5FF]" />
+                          <span class="text-xs font-bold">Klik / Drag Gambar Baru</span>
+                          <span class="text-[10px] text-slate-300">Format PNG, JPG, WEBP, GIF</span>
+                        </div>
+
+                        <!-- Loading Overlay -->
+                        <div v-if="isUploadingImage" class="absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center text-white z-20 space-y-2">
+                          <RefreshCw class="w-6 h-6 animate-spin text-[#3DA5FF]" />
+                          <span class="text-xs font-bold">Mengunggah Gambar... {{ imageUploadProgress }}%</span>
+                        </div>
                       </div>
+
+                      <!-- Browse File Button -->
                       <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">URL Gambar</label>
+                        <label
+                          class="w-full py-2.5 px-4 rounded-xl bg-[#F0F7FE] border border-[#3DA5FF]/30 hover:bg-blue-100 text-xs font-bold text-[#3587CE] flex items-center justify-center gap-2 transition cursor-pointer text-center"
+                        >
+                          <ImagePlus class="w-4 h-4" />
+                          <span>Browse Gambar dari Komputer</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="handleImageFileInput"
+                          />
+                        </label>
+                      </div>
+
+                      <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Atau Tempelkan URL Gambar</label>
                         <input
                           v-model="currentForm.image"
                           placeholder="/es_batu_card.jpg"
@@ -489,28 +694,30 @@ const navItems = [
 
                     <!-- Status summary -->
                     <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
-                      <h3 class="text-sm font-bold text-[#0F3261]">Status Konten</h3>
+                      <h3 class="text-sm font-bold text-[#0F3261]">Status Video 4 Mode</h3>
                       <div class="space-y-2 text-xs">
-                        <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
-                          <span class="text-slate-500">Judul</span>
-                          <span :class="currentForm.title ? 'text-emerald-600 font-semibold' : 'text-rose-500'">
-                            {{ currentForm.title ? '✓ Terisi' : '✗ Wajib' }}
+                        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                          <span class="text-slate-500">Video Standar</span>
+                          <span :class="currentForm.standardContent?.videoUrl ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                            {{ currentForm.standardContent?.videoUrl ? '✓ Tersimpan' : 'Kosong' }}
                           </span>
                         </div>
-                        <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
-                          <span class="text-slate-500">Babak Video</span>
-                          <span class="text-[#0F3261] font-bold">{{ currentForm.steps.length }} babak</span>
-                        </div>
-                        <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
-                          <span class="text-slate-500">Video Standard</span>
-                          <span class="text-[#3587CE] font-bold">
-                            {{ currentForm.steps.filter(s => s.standardContent?.videoUrl).length }}/{{ currentForm.steps.length }}
+                        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                          <span class="text-slate-500">Video Slow</span>
+                          <span :class="currentForm.slowContent?.videoUrl ? 'text-purple-600 font-bold' : 'text-slate-400'">
+                            {{ currentForm.slowContent?.videoUrl ? '✓ Tersimpan' : 'Kosong' }}
                           </span>
                         </div>
-                        <div class="flex items-center justify-between py-1.5">
+                        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                          <span class="text-slate-500">Video High Contrast</span>
+                          <span :class="currentForm.highContrastContent?.videoUrl ? 'text-amber-600 font-bold' : 'text-slate-400'">
+                            {{ currentForm.highContrastContent?.videoUrl ? '✓ Tersimpan' : 'Kosong' }}
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between py-1">
                           <span class="text-slate-500">Video Focus</span>
-                          <span class="text-[#FF7315] font-bold">
-                            {{ currentForm.steps.filter(s => s.focusContent?.videoUrl).length }}/{{ currentForm.steps.length }}
+                          <span :class="currentForm.focusContent?.videoUrl ? 'text-[#FF7315] font-bold' : 'text-slate-400'">
+                            {{ currentForm.focusContent?.videoUrl ? '✓ Tersimpan' : 'Kosong' }}
                           </span>
                         </div>
                       </div>
@@ -518,211 +725,340 @@ const navItems = [
                   </div>
                 </div>
 
-                <!-- ---- TAB: STANDARD MODE ---- -->
-                <div v-if="activeFormTab === 'standard'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3" style="background:linear-gradient(135deg,#EAF3FD,#f4f9fe);">
-                    <Sparkles class="w-5 h-5 text-[#3587CE]" />
+                <!-- ---- TAB 2: STANDAR MODE ---- -->
+                <div v-if="activeFormTab === 'standard'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
+                  <div class="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                    <Sparkles class="w-6 h-6 text-[#3587CE]" />
                     <div>
-                      <h3 class="font-bold text-[#0F3261]">Konfigurasi Standard Mode</h3>
-                      <p class="text-xs text-slate-500">Mode penuh: animasi, narasi lengkap, kecepatan 1.0x</p>
+                      <h3 class="font-bold text-[#0F3261]">1. Standar Mode</h3>
+                      <p class="text-xs text-slate-500">Visual, animasi, dan narasi audio lengkap untuk pengalaman belajar menyeluruh.</p>
                     </div>
                   </div>
-                  <div class="p-6 space-y-4">
+
+                  <div class="space-y-4">
                     <div>
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Mode</label>
-                      <input v-model="currentForm.standardConfig.title" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#3DA5FF] focus:outline-none text-sm" />
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Narasi (Standar)</label>
+                      <input v-model="currentForm.standardContent.title" placeholder="Judul narasi Standar Mode..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm" />
                     </div>
                     <div>
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-3">Keunggulan yang Ditampilkan ke Siswa</label>
-                      <div class="space-y-2">
-                        <div v-for="(feat, idx) in currentForm.standardConfig.features" :key="idx" class="flex items-center gap-3">
-                          <div class="w-6 h-6 rounded-full bg-[#3DA5FF] flex items-center justify-center shrink-0">
-                            <CheckCircle2 class="w-3.5 h-3.5 text-white" />
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Teks Narasi / Penjelasan</label>
+                      <textarea v-model="currentForm.standardContent.text" rows="3" placeholder="Teks narasi yang dibacakan / ditampilkan pada Standar Mode..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm resize-none"></textarea>
+                    </div>
+
+                    <!-- Upload Zone Standard -->
+                    <div>
+                      <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">Video Standar Mode</label>
+                      <div
+                        @dragover.prevent="dragOverKey = 'standard'"
+                        @dragleave="dragOverKey = null"
+                        @drop="handleDrop($event, 'standard')"
+                        :class="[
+                          'relative border-2 border-dashed rounded-2xl overflow-hidden transition p-6 text-center',
+                          dragOverKey === 'standard' ? 'border-[#3DA5FF] bg-blue-50' :
+                          currentForm.standardContent.videoUrl ? 'border-emerald-400 bg-emerald-50/40' :
+                          'border-slate-200 hover:border-[#3DA5FF] hover:bg-blue-50/20'
+                        ]"
+                      >
+                        <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, 'standard')" />
+                        <div v-if="uploadTargetKey === 'standard' && isUploadingVideo" class="space-y-2">
+                          <UploadCloud class="w-7 h-7 text-[#3587CE] mx-auto animate-bounce" />
+                          <p class="text-xs text-[#3587CE] font-bold">Mengunggah Video Standar... {{ uploadProgress }}%</p>
+                        </div>
+                        <div v-else-if="currentForm.standardContent.videoUrl" class="flex items-center justify-center gap-3">
+                          <CheckCircle2 class="w-6 h-6 text-emerald-600 shrink-0" />
+                          <div class="text-left min-w-0">
+                            <p class="text-xs font-bold text-emerald-700">✓ Video Standar Mode Tersimpan</p>
+                            <p class="text-[11px] text-slate-400 font-mono truncate max-w-md">{{ currentForm.standardContent.videoUrl }}</p>
                           </div>
-                          <input v-model="currentForm.standardConfig.features[idx]" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none" />
+                        </div>
+                        <div v-else class="space-y-1">
+                          <UploadCloud class="w-8 h-8 text-slate-300 mx-auto" />
+                          <p class="text-xs font-bold text-slate-600">Drag & drop video Standar atau klik untuk pilih file</p>
+                          <p class="text-[11px] text-slate-400">Format MP4, WebM, MOV</p>
                         </div>
                       </div>
-                      <button @click="currentForm.standardConfig.features.push('')" class="mt-3 text-xs text-[#3587CE] font-semibold cursor-pointer hover:underline">
-                        + Tambah poin
-                      </button>
+                      <input v-model="currentForm.standardContent.videoUrl" placeholder="atau tempelkan URL video langsung..." class="mt-2.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-600 focus:outline-none" />
                     </div>
                   </div>
                 </div>
 
-                <!-- ---- TAB: FOCUS MODE ---- -->
-                <div v-if="activeFormTab === 'focus'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3" style="background:linear-gradient(135deg,#FFF5EC,#fffaf5);">
-                    <Sun class="w-5 h-5 text-[#FF7315]" />
+                <!-- ---- TAB 3: SLOW MODE ---- -->
+                <div v-if="activeFormTab === 'slow'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
+                  <div class="flex items-center gap-3 p-4 rounded-xl bg-purple-50 border border-purple-100">
+                    <span class="text-2xl">🐢</span>
                     <div>
-                      <h3 class="font-bold text-[#0F3261]">Konfigurasi Focus Mode</h3>
-                      <p class="text-xs text-slate-500">Ramah ADHD/sensorik: kecepatan 0.75x, kontras tinggi</p>
+                      <h3 class="font-bold text-purple-900">2. Slow Mode</h3>
+                      <p class="text-xs text-purple-700">Video & audio diputar 0.75x lebih lambat dengan penjelasan bertahap.</p>
                     </div>
                   </div>
-                  <div class="p-6 space-y-4">
+
+                  <div class="space-y-4">
                     <div>
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Mode</label>
-                      <input v-model="currentForm.focusConfig.title" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#FF7315] focus:outline-none text-sm" />
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Narasi (Slow)</label>
+                      <input v-model="currentForm.slowContent.title" placeholder="Judul narasi Slow Mode..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm" />
                     </div>
                     <div>
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-3">Keunggulan yang Ditampilkan ke Siswa</label>
-                      <div class="space-y-2">
-                        <div v-for="(feat, idx) in currentForm.focusConfig.features" :key="idx" class="flex items-center gap-3">
-                          <div class="w-6 h-6 rounded-full bg-[#FF7315] flex items-center justify-center shrink-0">
-                            <CheckCircle2 class="w-3.5 h-3.5 text-white" />
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Teks Narasi / Penjelasan Bertahap</label>
+                      <textarea v-model="currentForm.slowContent.text" rows="3" placeholder="Teks narasi bertahap untuk Slow Mode..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm resize-none"></textarea>
+                    </div>
+
+                    <!-- Upload Zone Slow -->
+                    <div>
+                      <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">Video Slow Mode</label>
+                      <div
+                        @dragover.prevent="dragOverKey = 'slow'"
+                        @dragleave="dragOverKey = null"
+                        @drop="handleDrop($event, 'slow')"
+                        :class="[
+                          'relative border-2 border-dashed rounded-2xl overflow-hidden transition p-6 text-center',
+                          dragOverKey === 'slow' ? 'border-purple-500 bg-purple-50' :
+                          currentForm.slowContent?.videoUrl ? 'border-emerald-400 bg-emerald-50/40' :
+                          'border-slate-200 hover:border-purple-400 hover:bg-purple-50/20'
+                        ]"
+                      >
+                        <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, 'slow')" />
+                        <div v-if="uploadTargetKey === 'slow' && isUploadingVideo" class="space-y-2">
+                          <UploadCloud class="w-7 h-7 text-purple-600 mx-auto animate-bounce" />
+                          <p class="text-xs text-purple-700 font-bold">Mengunggah Video Slow... {{ uploadProgress }}%</p>
+                        </div>
+                        <div v-else-if="currentForm.slowContent?.videoUrl" class="flex items-center justify-center gap-3">
+                          <CheckCircle2 class="w-6 h-6 text-emerald-600 shrink-0" />
+                          <div class="text-left min-w-0">
+                            <p class="text-xs font-bold text-emerald-700">✓ Video Slow Mode Tersimpan</p>
+                            <p class="text-[11px] text-slate-400 font-mono truncate max-w-md">{{ currentForm.slowContent.videoUrl }}</p>
                           </div>
-                          <input v-model="currentForm.focusConfig.features[idx]" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none" />
+                        </div>
+                        <div v-else class="space-y-1">
+                          <UploadCloud class="w-8 h-8 text-slate-300 mx-auto" />
+                          <p class="text-xs font-bold text-slate-600">Drag & drop video Slow atau klik untuk pilih file</p>
+                          <p class="text-[11px] text-slate-400">Format MP4, WebM, MOV</p>
                         </div>
                       </div>
-                      <button @click="currentForm.focusConfig.features.push('')" class="mt-3 text-xs text-[#FF7315] font-semibold cursor-pointer hover:underline">
-                        + Tambah poin
-                      </button>
+                      <input v-model="currentForm.slowContent.videoUrl" placeholder="atau tempelkan URL video langsung..." class="mt-2.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-600 focus:outline-none" />
                     </div>
                   </div>
                 </div>
 
-                <!-- ---- TAB: BABAK VIDEO ---- -->
-                <div v-if="activeFormTab === 'steps'" class="space-y-4">
-                  <div class="flex items-center justify-between">
+                <!-- ---- TAB 4: HIGH CONTRAST MODE ---- -->
+                <div v-if="activeFormTab === 'high_contrast'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
+                  <div class="flex items-center gap-3 p-4 rounded-xl bg-slate-900 text-white">
+                    <span class="text-2xl">👁️‍🗨️</span>
                     <div>
-                      <h3 class="font-bold text-[#0F3261]">Babak Video ({{ currentForm.steps.length }})</h3>
-                      <p class="text-xs text-slate-400 mt-0.5">Setiap babak memiliki video Standard & Focus terpisah.</p>
+                      <h3 class="font-bold text-yellow-400">3. High Contrast Mode</h3>
+                      <p class="text-xs text-slate-300">Visual kontras tinggi, teks berukuran besar, dan ramah mata.</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Teks Kontras (Huruf Besar)</label>
+                      <input v-model="currentForm.highContrastContent.title" placeholder="JUDUL TEKS KONTRAST..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm font-bold" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Teks Narasi Huruf Besar</label>
+                      <textarea v-model="currentForm.highContrastContent.text" rows="3" placeholder="TEKS PENJELASAN DALAM HURUF BESAR DAN JELAS..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm font-bold resize-none"></textarea>
+                    </div>
+
+                    <!-- Upload Zone High Contrast -->
+                    <div>
+                      <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">Video High Contrast Mode</label>
+                      <div
+                        @dragover.prevent="dragOverKey = 'high_contrast'"
+                        @dragleave="dragOverKey = null"
+                        @drop="handleDrop($event, 'high_contrast')"
+                        :class="[
+                          'relative border-2 border-dashed rounded-2xl overflow-hidden transition p-6 text-center',
+                          dragOverKey === 'high_contrast' ? 'border-yellow-500 bg-yellow-50' :
+                          currentForm.highContrastContent?.videoUrl ? 'border-emerald-400 bg-emerald-50/40' :
+                          'border-slate-200 hover:border-yellow-500 hover:bg-amber-50/20'
+                        ]"
+                      >
+                        <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, 'high_contrast')" />
+                        <div v-if="uploadTargetKey === 'high_contrast' && isUploadingVideo" class="space-y-2">
+                          <UploadCloud class="w-7 h-7 text-yellow-600 mx-auto animate-bounce" />
+                          <p class="text-xs text-amber-700 font-bold">Mengunggah Video High Contrast... {{ uploadProgress }}%</p>
+                        </div>
+                        <div v-else-if="currentForm.highContrastContent?.videoUrl" class="flex items-center justify-center gap-3">
+                          <CheckCircle2 class="w-6 h-6 text-emerald-600 shrink-0" />
+                          <div class="text-left min-w-0">
+                            <p class="text-xs font-bold text-emerald-700">✓ Video High Contrast Mode Tersimpan</p>
+                            <p class="text-[11px] text-slate-400 font-mono truncate max-w-md">{{ currentForm.highContrastContent.videoUrl }}</p>
+                          </div>
+                        </div>
+                        <div v-else class="space-y-1">
+                          <UploadCloud class="w-8 h-8 text-slate-300 mx-auto" />
+                          <p class="text-xs font-bold text-slate-600">Drag & drop video High Contrast atau klik untuk pilih file</p>
+                          <p class="text-[11px] text-slate-400">Format MP4, WebM, MOV</p>
+                        </div>
+                      </div>
+                      <input v-model="currentForm.highContrastContent.videoUrl" placeholder="atau tempelkan URL video langsung..." class="mt-2.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-600 focus:outline-none" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ---- TAB 5: FOCUS MODE ---- -->
+                <div v-if="activeFormTab === 'focus'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
+                  <div class="flex items-center gap-3 p-4 rounded-xl bg-orange-50 border border-orange-100">
+                    <Sun class="w-6 h-6 text-[#FF7315]" />
+                    <div>
+                      <h3 class="font-bold text-[#0F3261]">4. Focus Mode</h3>
+                      <p class="text-xs text-slate-500">Tampilan sederhana, bebas distraksi, dan elemen tenang.</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Narasi (Focus)</label>
+                      <input v-model="currentForm.focusContent.title" placeholder="Judul ringkas Focus Mode..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Teks Narasi Ringkas</label>
+                      <textarea v-model="currentForm.focusContent.text" rows="3" placeholder="Kalimat pendek & langsung ke poin utama..." class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm resize-none"></textarea>
+                    </div>
+
+                    <!-- Upload Zone Focus -->
+                    <div>
+                      <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">Video Focus Mode</label>
+                      <div
+                        @dragover.prevent="dragOverKey = 'focus'"
+                        @dragleave="dragOverKey = null"
+                        @drop="handleDrop($event, 'focus')"
+                        :class="[
+                          'relative border-2 border-dashed rounded-2xl overflow-hidden transition p-6 text-center',
+                          dragOverKey === 'focus' ? 'border-[#FF7315] bg-orange-50' :
+                          currentForm.focusContent?.videoUrl ? 'border-emerald-400 bg-emerald-50/40' :
+                          'border-slate-200 hover:border-[#FF7315] hover:bg-orange-50/20'
+                        ]"
+                      >
+                        <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, 'focus')" />
+                        <div v-if="uploadTargetKey === 'focus' && isUploadingVideo" class="space-y-2">
+                          <UploadCloud class="w-7 h-7 text-[#FF7315] mx-auto animate-bounce" />
+                          <p class="text-xs text-[#FF7315] font-bold">Mengunggah Video Focus... {{ uploadProgress }}%</p>
+                        </div>
+                        <div v-else-if="currentForm.focusContent?.videoUrl" class="flex items-center justify-center gap-3">
+                          <CheckCircle2 class="w-6 h-6 text-emerald-600 shrink-0" />
+                          <div class="text-left min-w-0">
+                            <p class="text-xs font-bold text-emerald-700">✓ Video Focus Mode Tersimpan</p>
+                            <p class="text-[11px] text-slate-400 font-mono truncate max-w-md">{{ currentForm.focusContent.videoUrl }}</p>
+                          </div>
+                        </div>
+                        <div v-else class="space-y-1">
+                          <UploadCloud class="w-8 h-8 text-slate-300 mx-auto" />
+                          <p class="text-xs font-bold text-slate-600">Drag & drop video Focus atau klik untuk pilih file</p>
+                          <p class="text-[11px] text-slate-400">Format MP4, WebM, MOV</p>
+                        </div>
+                      </div>
+                      <input v-model="currentForm.focusContent.videoUrl" placeholder="atau tempelkan URL video langsung..." class="mt-2.5 w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-600 focus:outline-none" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ---- TAB 6: ASESMEN & KUIS ---- -->
+                <div v-if="activeFormTab === 'assessment'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-6">
+                  <div class="flex items-center justify-between p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg">
+                        ✍️
+                      </div>
+                      <div>
+                        <h3 class="font-bold text-indigo-950">Asesmen & Kuis Pilihan Ganda</h3>
+                        <p class="text-xs text-indigo-700">Atur soal kuis per materi. Kuis ini akan terbuka di player siswa setelah menonton video.</p>
+                      </div>
                     </div>
                     <button
-                      @click="addStep"
-                      class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-bold cursor-pointer active:scale-95 transition"
-                      style="background:#16a34a;"
+                      type="button"
+                      @click="addQuestion"
+                      class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
-                      <Plus class="w-4 h-4" /> Tambah Babak
+                      <Plus class="w-4 h-4" /> Tambah Soal
                     </button>
                   </div>
 
-                  <div
-                    v-for="(st, idx) in currentForm.steps"
-                    :key="st.id || idx"
-                    class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
-                  >
-                    <!-- Step header bar -->
-                    <div class="flex items-center gap-4 px-5 py-4 border-b border-slate-100 bg-slate-50">
-                      <span class="w-8 h-8 rounded-xl bg-[#0F3261] text-white text-sm font-extrabold flex items-center justify-center shrink-0">
-                        {{ idx + 1 }}
-                      </span>
-                      <input
-                        v-model="st.title"
-                        placeholder="Nama babak..."
-                        class="flex-1 bg-transparent font-bold text-[#0F3261] text-base border-none outline-none placeholder:text-slate-300 placeholder:font-normal"
-                      />
-                      <button
-                        @click="removeStep(idx)"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-50 border border-rose-200 transition cursor-pointer"
-                      >
-                        <X class="w-3.5 h-3.5" /> Hapus
-                      </button>
-                    </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Judul Asesmen</label>
+                    <input
+                      v-model="currentForm.assessment.title"
+                      placeholder="Contoh: Asesmen Pemahaman Perubahan Wujud Benda"
+                      class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm font-bold text-slate-800"
+                    />
+                  </div>
 
-                    <!-- Side-by-side: Standard | Focus -->
-                    <div class="grid grid-cols-1 md:grid-cols-2">
-                      <!-- Standard Side -->
-                      <div class="p-5 space-y-3 border-r border-slate-100 md:border-b-0 border-b">
-                        <div class="flex items-center gap-2 mb-1">
-                          <div class="w-3 h-3 rounded-full bg-[#3587CE]"></div>
-                          <span class="text-sm font-bold text-[#3587CE]">Standard Mode</span>
-                          <span class="ml-auto text-[10px] font-mono bg-blue-50 text-[#3587CE] px-2 py-0.5 rounded-full">1.0x</span>
-                        </div>
-                        <input v-model="st.standardContent.title" placeholder="Judul narasi..." class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none" />
-                        <textarea v-model="st.standardContent.text" rows="3" placeholder="Teks narasi / penjelasan animasi..." class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none resize-none"></textarea>
+                  <!-- Questions List -->
+                  <div v-if="!currentForm.assessment?.questions?.length" class="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    <HelpCircle class="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p class="text-sm font-bold text-slate-600">Belum ada soal untuk materi ini</p>
+                    <p class="text-xs text-slate-400 mb-4">Klik tombol di bawah untuk membuat soal pilihan ganda baru</p>
+                    <button
+                      type="button"
+                      @click="addQuestion"
+                      class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus class="w-4 h-4" /> Tambah Soal Pertama
+                    </button>
+                  </div>
 
-                        <!-- Upload Zone Standard -->
-                        <div>
-                          <label class="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Video Standard</label>
-                          <div
-                            @dragover.prevent="dragOverKey = `step-${idx}-standard`"
-                            @dragleave="dragOverKey = null"
-                            @drop="handleDrop($event, idx, 'standard')"
-                            :class="[
-                              'relative border-2 border-dashed rounded-xl overflow-hidden transition',
-                              dragOverKey === `step-${idx}-standard` ? 'border-[#3DA5FF] bg-blue-50' :
-                              st.standardContent.videoUrl ? 'border-emerald-300 bg-emerald-50/40' :
-                              'border-slate-200 hover:border-[#3DA5FF] hover:bg-blue-50/20'
-                            ]"
-                          >
-                            <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, idx, 'standard')" />
-                            <!-- Uploading state -->
-                            <div v-if="uploadTargetKey === `step-${idx}-standard` && isUploadingVideo" class="p-5 text-center space-y-2">
-                              <UploadCloud class="w-6 h-6 text-[#3587CE] mx-auto animate-bounce" />
-                              <div class="w-full bg-blue-100 rounded-full h-2">
-                                <div class="bg-[#3587CE] h-2 rounded-full transition-all duration-300" :style="`width:${uploadProgress}%`"></div>
-                              </div>
-                              <p class="text-xs text-[#3587CE] font-bold">Mengunggah ke Cloudinary... {{ uploadProgress }}%</p>
-                            </div>
-                            <!-- Has video -->
-                            <div v-else-if="st.standardContent.videoUrl" class="p-4 flex items-center gap-3">
-                              <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                                <CheckCircle2 class="w-5 h-5 text-emerald-600" />
-                              </div>
-                              <div class="min-w-0">
-                                <p class="text-xs font-bold text-emerald-700">Video tersimpan</p>
-                                <p class="text-[10px] text-slate-400 truncate">{{ st.standardContent.videoUrl }}</p>
-                              </div>
-                            </div>
-                            <!-- Empty state -->
-                            <div v-else class="p-5 text-center">
-                              <UploadCloud class="w-7 h-7 text-slate-300 mx-auto mb-2" />
-                              <p class="text-xs font-semibold text-slate-400">Drag & drop video atau klik untuk pilih</p>
-                              <p class="text-[10px] text-slate-300 mt-0.5">MP4, MOV, WebM</p>
-                            </div>
-                          </div>
-                          <input v-model="st.standardContent.videoUrl" placeholder="atau paste URL video..." class="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-[11px] font-mono text-slate-500 focus:outline-none" />
-                        </div>
+                  <div v-else class="space-y-6">
+                    <div
+                      v-for="(q, qIdx) in currentForm.assessment.questions"
+                      :key="q.id || qIdx"
+                      class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4 relative group hover:border-indigo-300 transition"
+                    >
+                      <div class="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-3 py-1 rounded-lg">
+                          Soal {{ qIdx + 1 }}
+                        </span>
+                        <button
+                          type="button"
+                          @click="removeQuestion(qIdx)"
+                          class="text-xs font-bold text-rose-500 hover:text-rose-700 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg transition cursor-pointer"
+                        >
+                          <Trash2 class="w-3.5 h-3.5" /> Hapus Soal
+                        </button>
                       </div>
 
-                      <!-- Focus Side -->
-                      <div class="p-5 space-y-3">
-                        <div class="flex items-center gap-2 mb-1">
-                          <div class="w-3 h-3 rounded-full bg-[#FF7315]"></div>
-                          <span class="text-sm font-bold text-[#FF7315]">Focus Mode</span>
-                          <span class="ml-auto text-[10px] font-mono bg-orange-50 text-[#FF7315] px-2 py-0.5 rounded-full">0.75x</span>
-                        </div>
-                        <input v-model="st.focusContent.title" placeholder="Judul ringkas..." class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none" />
-                        <textarea v-model="st.focusContent.text" rows="3" placeholder="Kalimat pendek & mudah dipahami..." class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none resize-none"></textarea>
+                      <div>
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1">Pertanyaan / Soal</label>
+                        <textarea
+                          v-model="q.questionText"
+                          rows="2"
+                          placeholder="Tuliskan pertanyaan pilihan ganda di sini..."
+                          class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:border-indigo-500 focus:outline-none resize-none font-medium"
+                        ></textarea>
+                      </div>
 
-                        <!-- Upload Zone Focus -->
-                        <div>
-                          <label class="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-2">Video Focus</label>
-                          <div
-                            @dragover.prevent="dragOverKey = `step-${idx}-focus`"
-                            @dragleave="dragOverKey = null"
-                            @drop="handleDrop($event, idx, 'focus')"
-                            :class="[
-                              'relative border-2 border-dashed rounded-xl overflow-hidden transition',
-                              dragOverKey === `step-${idx}-focus` ? 'border-[#FF7315] bg-orange-50' :
-                              st.focusContent.videoUrl ? 'border-emerald-300 bg-emerald-50/40' :
-                              'border-slate-200 hover:border-[#FF7315] hover:bg-orange-50/20'
-                            ]"
+                      <!-- Options A, B, C, D -->
+                      <div class="space-y-2.5">
+                        <label class="text-xs font-bold text-slate-600 uppercase tracking-wide block">Pilihan Jawaban (Pilih Radio Button untuk Jawaban Benar)</label>
+                        <div
+                          v-for="(opt, oIdx) in 4"
+                          :key="oIdx"
+                          :class="[
+                            'flex items-center gap-3 p-2.5 rounded-xl border transition',
+                            q.correctOptionIndex === oIdx ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'
+                          ]"
+                        >
+                          <label class="flex items-center justify-center w-7 h-7 rounded-lg font-bold text-xs shrink-0 cursor-pointer"
+                            :class="q.correctOptionIndex === oIdx ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'"
                           >
-                            <input type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" @change="handleFileInput($event, idx, 'focus')" />
-                            <div v-if="uploadTargetKey === `step-${idx}-focus` && isUploadingVideo" class="p-5 text-center space-y-2">
-                              <UploadCloud class="w-6 h-6 text-[#FF7315] mx-auto animate-bounce" />
-                              <div class="w-full bg-orange-100 rounded-full h-2">
-                                <div class="bg-[#FF7315] h-2 rounded-full transition-all duration-300" :style="`width:${uploadProgress}%`"></div>
-                              </div>
-                              <p class="text-xs text-[#FF7315] font-bold">Mengunggah ke Cloudinary... {{ uploadProgress }}%</p>
-                            </div>
-                            <div v-else-if="st.focusContent.videoUrl" class="p-4 flex items-center gap-3">
-                              <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                                <CheckCircle2 class="w-5 h-5 text-emerald-600" />
-                              </div>
-                              <div class="min-w-0">
-                                <p class="text-xs font-bold text-emerald-700">Video tersimpan</p>
-                                <p class="text-[10px] text-slate-400 truncate">{{ st.focusContent.videoUrl }}</p>
-                              </div>
-                            </div>
-                            <div v-else class="p-5 text-center">
-                              <UploadCloud class="w-7 h-7 text-slate-300 mx-auto mb-2" />
-                              <p class="text-xs font-semibold text-slate-400">Drag & drop video atau klik untuk pilih</p>
-                              <p class="text-[10px] text-slate-300 mt-0.5">MP4, MOV, WebM</p>
-                            </div>
-                          </div>
-                          <input v-model="st.focusContent.videoUrl" placeholder="atau paste URL video..." class="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-[11px] font-mono text-slate-500 focus:outline-none" />
+                            <input
+                              type="radio"
+                              :name="`correct-${qIdx}`"
+                              :value="oIdx"
+                              v-model="q.correctOptionIndex"
+                              class="sr-only"
+                            />
+                            {{ String.fromCharCode(65 + oIdx) }}
+                          </label>
+
+                          <input
+                            v-model="q.options[oIdx]"
+                            :placeholder="`Pilihan ${String.fromCharCode(65 + oIdx)}...`"
+                            class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm focus:bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+
+                          <span v-if="q.correctOptionIndex === oIdx" class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md shrink-0 flex items-center gap-1">
+                            <CheckCircle2 class="w-3.5 h-3.5" /> Jawaban Benar
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -730,7 +1066,7 @@ const navItems = [
                 </div>
 
                 <!-- Save bar at bottom -->
-                <div class="flex items-center justify-between pt-4 mt-2 border-t border-slate-200">
+                <div class="flex items-center justify-between pt-4 mt-6 border-t border-slate-200">
                   <button @click="showForm = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 transition cursor-pointer">
                     Batal
                   </button>
@@ -775,13 +1111,13 @@ const navItems = [
               <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
                 <div class="flex items-center justify-between">
                   <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
-                    <FileVideo class="w-5 h-5 text-[#FF7315]" />
+                    <Sparkles class="w-5 h-5 text-[#FF7315]" />
                   </div>
                   <ArrowUpRight class="w-4 h-4 text-emerald-400" />
                 </div>
                 <div>
-                  <p class="text-3xl font-extrabold text-[#0F3261]">{{ totalSteps }}</p>
-                  <p class="text-xs text-slate-400 font-medium mt-0.5">Total Babak Video</p>
+                  <p class="text-3xl font-extrabold text-[#0F3261]">{{ totalPoinBelajar }}</p>
+                  <p class="text-xs text-slate-400 font-medium mt-0.5">Poin Belajar</p>
                 </div>
               </div>
 
@@ -926,7 +1262,7 @@ const navItems = [
               <div class="grid grid-cols-12 gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wide">
                 <div class="col-span-5">Materi</div>
                 <div class="col-span-2 hidden md:block">Jenjang</div>
-                <div class="col-span-2 hidden lg:block">Babak</div>
+                <div class="col-span-2 hidden lg:block">Status Mode</div>
                 <div class="col-span-1 hidden lg:block">Badge</div>
                 <div class="col-span-3 lg:col-span-2 text-right">Aksi</div>
               </div>
@@ -956,10 +1292,11 @@ const navItems = [
                   <div class="col-span-2 hidden md:block">
                     <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-[#3587CE] text-xs font-bold">{{ item.jenjang }}</span>
                   </div>
-                  <!-- Babak -->
+                  <!-- Mode Status -->
                   <div class="col-span-2 hidden lg:block">
-                    <span class="text-sm font-bold text-[#0F3261]">{{ item.steps?.length || 0 }}</span>
-                    <span class="text-xs text-slate-400 ml-1">babak</span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 4 Mode Ready
+                    </span>
                   </div>
                   <!-- Badge -->
                   <div class="col-span-1 hidden lg:block">
@@ -1000,7 +1337,7 @@ const navItems = [
           <div v-else-if="activePage === 'video'" class="p-6 space-y-5">
             <div>
               <h1 class="text-2xl font-extrabold text-[#0F3261]">Manajemen Video</h1>
-              <p class="text-slate-400 text-sm mt-0.5">Ringkasan video yang sudah diupload ke Cloudinary</p>
+              <p class="text-slate-400 text-sm mt-0.5">Ringkasan video 4 mode yang tersimpan per materi</p>
             </div>
 
             <!-- Cloudinary status card -->
@@ -1017,7 +1354,7 @@ const navItems = [
                 </p>
                 <p :class="['text-xs mt-1', isCloudinaryConfigured ? 'text-emerald-600' : 'text-amber-600']">
                   {{ isCloudinaryConfigured
-                    ? 'Video akan diunggah langsung ke Cloudinary CDN. Buka form edit materi untuk upload video per babak.'
+                    ? 'Video diunggah langsung ke Cloudinary CDN. Buka form edit materi untuk mengelola video per mode.'
                     : 'Isi VITE_CLOUDINARY_CLOUD_NAME dan VITE_CLOUDINARY_UPLOAD_PRESET di file .env.local, lalu restart server.'
                   }}
                 </p>
@@ -1035,38 +1372,40 @@ const navItems = [
                   <img :src="item.image || '/es_batu_card.jpg'" :alt="item.title" class="w-10 h-10 rounded-xl object-cover shrink-0" />
                   <div class="flex-1">
                     <p class="font-bold text-[#0F3261] text-sm">{{ item.title }}</p>
-                    <p class="text-xs text-slate-400">{{ item.steps?.length || 0 }} babak video</p>
+                    <p class="text-xs text-slate-400">4 Mode Belajar Terkonfigurasi</p>
                   </div>
                   <button @click="openEditForm(item)" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white cursor-pointer" style="background:#0F3261;">
-                    <Edit3 class="w-3.5 h-3.5" /> Kelola Video
+                    <Edit3 class="w-3.5 h-3.5" /> Kelola Video Mode
                   </button>
                 </div>
-                <div class="divide-y divide-slate-50">
-                  <div
-                    v-for="(step, idx) in (item.steps || [])"
-                    :key="step.id || idx"
-                    class="grid grid-cols-12 items-center gap-3 px-5 py-3 text-xs"
-                  >
-                    <div class="col-span-1">
-                      <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[11px]">{{ idx + 1 }}</span>
-                    </div>
-                    <div class="col-span-4 font-semibold text-slate-700 truncate">{{ step.title }}</div>
-                    <div class="col-span-3">
-                      <span :class="['inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold', step.standardContent?.videoUrl ? 'bg-blue-50 text-[#3587CE]' : 'bg-slate-100 text-slate-400']">
-                        <div class="w-1.5 h-1.5 rounded-full" :class="step.standardContent?.videoUrl ? 'bg-[#3587CE]' : 'bg-slate-300'"></div>
-                        Standard
-                      </span>
-                    </div>
-                    <div class="col-span-3">
-                      <span :class="['inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold', step.focusContent?.videoUrl ? 'bg-orange-50 text-[#FF7315]' : 'bg-slate-100 text-slate-400']">
-                        <div class="w-1.5 h-1.5 rounded-full" :class="step.focusContent?.videoUrl ? 'bg-[#FF7315]' : 'bg-slate-300'"></div>
-                        Focus
-                      </span>
-                    </div>
-                    <div class="col-span-1 text-right">
-                      <span v-if="step.standardContent?.videoUrl || step.focusContent?.videoUrl" class="text-emerald-500">✓</span>
-                      <span v-else class="text-slate-300">—</span>
-                    </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-4">
+                  <!-- Standar -->
+                  <div class="p-3 rounded-xl border border-blue-100 bg-blue-50/40 text-xs space-y-1">
+                    <p class="font-bold text-[#3587CE]">1. Standar Mode</p>
+                    <p :class="item.standardContent?.videoUrl ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                      {{ item.standardContent?.videoUrl ? '✓ Video Ready' : 'Belum Ada Video' }}
+                    </p>
+                  </div>
+                  <!-- Slow -->
+                  <div class="p-3 rounded-xl border border-purple-100 bg-purple-50/40 text-xs space-y-1">
+                    <p class="font-bold text-purple-700">2. Slow Mode</p>
+                    <p :class="item.slowContent?.videoUrl ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                      {{ item.slowContent?.videoUrl ? '✓ Video Ready' : 'Belum Ada Video' }}
+                    </p>
+                  </div>
+                  <!-- High Contrast -->
+                  <div class="p-3 rounded-xl border border-amber-100 bg-amber-50/40 text-xs space-y-1">
+                    <p class="font-bold text-amber-800">3. High Contrast</p>
+                    <p :class="item.highContrastContent?.videoUrl ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                      {{ item.highContrastContent?.videoUrl ? '✓ Video Ready' : 'Belum Ada Video' }}
+                    </p>
+                  </div>
+                  <!-- Focus -->
+                  <div class="p-3 rounded-xl border border-orange-100 bg-orange-50/40 text-xs space-y-1">
+                    <p class="font-bold text-[#FF7315]">4. Focus Mode</p>
+                    <p :class="item.focusContent?.videoUrl ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                      {{ item.focusContent?.videoUrl ? '✓ Video Ready' : 'Belum Ada Video' }}
+                    </p>
                   </div>
                 </div>
               </div>

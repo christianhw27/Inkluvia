@@ -282,7 +282,7 @@ const handleRegister = async () => {
                   class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
                 >
                   <div class="text-left">
-                    <p class="text-xs font-bold text-[#3587CE]">👤 Pengguna (Siswa/Guru) — user@inkluvia.id</p>
+                    <p class="text-xs font-bold text-[#3587CE]">👤 Pengguna — user@inkluvia.id</p>
                     <p class="text-[11px] text-slate-500 font-mono">password: user123</p>
                   </div>
                   <span class="text-[10px] text-[#3587CE] font-semibold bg-blue-100 px-2 py-0.5 rounded-full">Isi Otomatis</span>

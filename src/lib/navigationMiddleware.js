@@ -3,7 +3,7 @@ import { isAuthenticated, isAdmin } from './authService'
 /**
  * Route Permission Definitions:
  * - 'beranda': Public (Bebas diakses tanpa login)
- * - 'materi', 'materi-detail', 'mode-select', 'learning-player', 'guru': Protected (Harus login/buat akun)
+ * - 'materi', 'materi-detail', 'mode-select', 'learning-player': Protected (Harus login/buat akun)
  * - 'admin': Restricted (Harus login dan role === 'admin')
  */
 export const PUBLIC_ROUTES = ['beranda', 'auth']
@@ -12,8 +12,7 @@ export const PROTECTED_ROUTES = [
   'materi',
   'materi-detail',
   'mode-select',
-  'learning-player',
-  'guru'
+  'learning-player'
 ]
 
 export const ADMIN_ROUTES = ['admin']

@@ -67,15 +67,24 @@ const faqs = [
     a: 'Tentu saja! Anda bebas membatalkan perpanjangan langganan kapan saja dari halaman profil Anda tanpa denda atau syarat rumit.'
   },
   {
-    q: 'Apakah ada paket khusus untuk Sekolah atau Kelas Inklusi?',
-    a: 'Ada! Kami menyediakan lisensi rombel khusus sekolah dengan fitur cetak worksheet tanpa batas dan dashboard pemantauan guru. Hubungi tim kami untuk konsultasi lisensi sekolah.'
+    q: 'Apakah ada paket khusus untuk Komunitas atau Institusi?',
+    a: 'Ada! Kami menyediakan lisensi khusus kelompok dengan fitur cetak worksheet tanpa batas dan dashboard pemantauan belajar. Hubungi tim kami untuk konsultasi.'
   }
 ]
 </script>
 
 <template>
-  <div class="w-full bg-[#F0F7FF] py-10 sm:py-16 px-4 sm:px-6 lg:px-10 space-y-16">
-    <div class="w-full max-w-[1440px] mx-auto space-y-12">
+  <div class="w-full bg-transparent py-10 sm:py-16 px-4 sm:px-6 lg:px-10 space-y-16 relative overflow-hidden">
+    <!-- Subtle Soft Background Tints -->
+    <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#FFDC58]/08 blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-[#3DA5FF]/08 blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-[#FF74BC]/20 blur-3xl pointer-events-none"></div>
+
+    <!-- Floating Doodles -->
+    <div class="absolute top-12 left-8 text-2xl text-[#FFDC58] pointer-events-none animate-bounce-subtle hidden sm:block">⭐</div>
+    <div class="absolute top-20 right-12 text-2xl text-[#FF7315] pointer-events-none animate-spin-slow hidden sm:block">✨</div>
+
+    <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
 
       <!-- ==================== PAGE HEADER ==================== -->
       <div class="text-center max-w-3xl mx-auto space-y-4">
@@ -242,37 +251,28 @@ const faqs = [
           </div>
         </div>
 
-        <!-- COLUMN 3: ARTWORK & SPEECH BUBBLE (4 Cols) -->
-        <div class="lg:col-span-4 bg-white rounded-3xl p-8 border-2 border-blue-100 shadow-md flex flex-col items-center justify-center relative overflow-hidden text-center space-y-6">
-          
-          <!-- Speech Bubble -->
-          <div class="relative bg-gradient-to-r from-orange-500 to-[#FF7315] text-white p-4 sm:p-5 rounded-2xl shadow-lg border border-orange-300 text-xs sm:text-sm font-black animate-bubble-pop max-w-xs">
-            💬 "Belajar lebih seru, lebih lengkap, dan lebih bermanfaat bersama Si Es Batu!"
-            <!-- Arrow -->
-            <div class="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-[#FF7315]"></div>
-          </div>
-
+        <!-- COLUMN 3: ARTWORK DIRECTLY ON BACKGROUND (NO CARD WRAPPER, NO DUPLICATE SPEECH BUBBLE) -->
+        <div class="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-4 relative py-4">
           <!-- Illustration Image -->
-          <div class="w-full max-w-[280px] sm:max-w-[320px] rounded-3xl overflow-hidden border-4 border-blue-50 shadow-xl bg-blue-50/50">
+          <div class="w-full max-w-[360px] sm:max-w-[400px]">
             <img
-              src="/es_batu_card.jpg"
+              src="/Pricing_element.png"
               alt="Anak belajar gembira bersama Inkluvia"
-              class="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+              class="w-full h-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-xl"
             />
           </div>
 
           <!-- Trust Badges -->
-          <div class="space-y-2 pt-2 text-xs font-extrabold text-slate-500">
-            <div class="flex items-center justify-center gap-2">
+          <div class="space-y-2 pt-1 text-xs font-extrabold text-slate-600">
+            <div class="flex items-center justify-center gap-2 bg-white/80 backdrop-blur px-3.5 py-1.5 rounded-full border border-blue-100 shadow-2xs">
               <ShieldCheck class="w-4 h-4 text-emerald-500" />
               <span>Garansi Pembatalan Kapan Saja</span>
             </div>
-            <div class="flex items-center justify-center gap-2">
+            <div class="flex items-center justify-center gap-2 bg-white/80 backdrop-blur px-3.5 py-1.5 rounded-full border border-blue-100 shadow-2xs">
               <Heart class="w-4 h-4 text-rose-500" />
               <span>100% Ramah Anak & Bebas Iklan</span>
             </div>
           </div>
-
         </div>
 
       </div>
