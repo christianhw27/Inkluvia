@@ -366,7 +366,7 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
               ✨ Standar Mode: Pengalaman belajar interaktif dengan animasi dan audio jernih.
             </p>
             <p v-else-if="currentMode === 'slow'" class="text-purple-700 font-semibold">
-              🐢 Slow Mode: Kecepatan diputar 0.75x lebih lambat untuk pemahaman bertahap.
+              🐢 Slow Mode: Artikulasi bertahap dan jeda terukur untuk pemahaman optimal.
             </p>
             <p v-else-if="currentMode === 'high_contrast'" class="text-slate-900 font-bold">
               👁️ High Contrast Mode: Teks besar kontras tinggi untuk kenyamanan penglihatan.
@@ -478,7 +478,7 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
                     currentMode === 'focus'
                       ? 'Focus Mode (Tampilan Sederhana & Bebas Distraksi)'
                       : currentMode === 'slow'
-                        ? 'Slow Mode (Tempo Diputar 0.75x Bertahap)'
+                        ? 'Slow Mode (Tempo Terukur & Artikulasi Bertahap)'
                         : currentMode === 'high_contrast'
                           ? 'High Contrast Mode (Visual Kontras Tinggi & Teks Besar)'
                           : 'Standar Mode (Visual & Animasi Lengkap)'

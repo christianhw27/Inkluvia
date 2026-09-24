@@ -49,12 +49,20 @@ function loadUserSession() {
       const { valid, payload, error } = verifyJWT(token)
       if (valid && payload) {
         const meta = payload.user_metadata || {}
+        const email = (payload.email || '').toLowerCase()
+        const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+        const isProInRegistry = Boolean(proRegistry[email]?.isPro)
+        const isPro = Boolean(payload.isPro || meta.is_pro || isProInRegistry || payload.role === 'admin' || email.includes('admin'))
+
         return {
           id: payload.sub || payload.id || payload.email,
           name: payload.name || meta.full_name || payload.email?.split('@')[0],
           email: payload.email,
-          role: payload.role || meta.role || (payload.email?.includes('admin') ? 'admin' : 'user'),
+          role: payload.role || meta.role || (email.includes('admin') ? 'admin' : 'user'),
           avatar: payload.avatar || (payload.role === 'admin' ? '🛡️' : '👧'),
+          isPro,
+          tier: isPro ? 'pro' : 'free',
+          proPlanName: proRegistry[email]?.planName || (isPro ? 'Inkluvia Premium' : null),
           token,
           isSupabase: Boolean(payload.iss && payload.iss.includes('supabase'))
         }
@@ -69,16 +77,24 @@ function loadUserSession() {
     if (legacySaved) {
       const legacyUser = JSON.parse(legacySaved)
       if (legacyUser && legacyUser.email) {
+        const email = legacyUser.email.toLowerCase()
+        const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+        const isPro = Boolean(legacyUser.isPro || proRegistry[email]?.isPro || legacyUser.role === 'admin' || email.includes('admin'))
+
         const upgradedToken = signJWT({
           id: legacyUser.id || legacyUser.email,
           name: legacyUser.name,
           email: legacyUser.email,
           role: legacyUser.role || 'user',
-          avatar: legacyUser.avatar
+          avatar: legacyUser.avatar,
+          isPro,
+          tier: isPro ? 'pro' : 'free'
         })
         setStoredToken(upgradedToken)
         return {
           ...legacyUser,
+          isPro,
+          tier: isPro ? 'pro' : 'free',
           token: upgradedToken
         }
       }
@@ -101,7 +117,9 @@ function saveUserSession(user, token = null) {
         name: user.name,
         email: user.email,
         role: user.role || 'user',
-        avatar: user.avatar
+        avatar: user.avatar,
+        isPro: Boolean(user.isPro),
+        tier: user.isPro ? 'pro' : 'free'
       })
 
       user.token = jwtToken
@@ -119,6 +137,7 @@ function saveUserSession(user, token = null) {
 export const isAuthenticated = computed(() => Boolean(currentUser.value && currentUser.value.token))
 export const isAdmin = computed(() => currentUser.value?.role === 'admin')
 export const isStudent = computed(() => currentUser.value?.role === 'user')
+export const isProUser = computed(() => Boolean(currentUser.value?.isPro || currentUser.value?.role === 'admin'))
 export const currentToken = computed(() => currentUser.value?.token || getStoredToken())
 
 /**
@@ -403,6 +422,72 @@ export async function updateUserProfile({ name, avatar }) {
       })
     } catch (e) {
       console.warn('Supabase profile metadata update failed (non-critical):', e)
+    }
+  }
+
+  return currentUser.value
+}
+
+/**
+ * Upgrade Pengguna Aktif ke Status Inkluvia Premium PRO
+ * Setelah pembayaran Xendit Sandbox berhasil
+ */
+export async function upgradeCurrentUserToPro({
+  planName = 'Inkluvia Premium',
+  invoiceId = '',
+  paymentMethod = 'Xendit Sandbox'
+} = {}) {
+  if (!currentUser.value) return null
+
+  currentUser.value.isPro = true
+  currentUser.value.tier = 'pro'
+  currentUser.value.proActivatedAt = new Date().toISOString()
+  currentUser.value.proPlanName = planName
+
+  // Generate token JWT baru dengan klaim PRO
+  const token = signJWT({
+    id: currentUser.value.id || currentUser.value.email,
+    name: currentUser.value.name,
+    email: currentUser.value.email,
+    role: currentUser.value.role || 'user',
+    avatar: currentUser.value.avatar,
+    isPro: true,
+    tier: 'pro'
+  })
+
+  currentUser.value.token = token
+  saveUserSession(currentUser.value, token)
+
+  // Catat permanen di registry pelanggan pro lokal
+  try {
+    const emailKey = (currentUser.value.email || '').toLowerCase()
+    const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+    proRegistry[emailKey] = {
+      isPro: true,
+      tier: 'pro',
+      planName,
+      invoiceId,
+      paymentMethod,
+      activatedAt: new Date().toISOString()
+    }
+    localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+  } catch (e) {
+    console.error('Failed to save to pro subscriber registry:', e)
+  }
+
+  // Jika Supabase aktif, perbarui metadata di Supabase
+  if (isSupabaseConfigured && currentUser.value.isSupabase) {
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          is_pro: true,
+          tier: 'pro',
+          pro_plan: planName,
+          pro_invoice_id: invoiceId
+        }
+      })
+    } catch (e) {
+      console.warn('Supabase pro metadata update (non-critical):', e)
     }
   }
 

@@ -14,9 +14,13 @@ import {
   Heart,
   Star
 } from '@lucide/vue'
+import DoodleOrnament from './DoodleOrnament.vue'
+import XenditCheckoutModal from './XenditCheckoutModal.vue'
+import { currentUser, isAuthenticated, isProUser } from '../lib/authService'
+import { pricingConfig, formatRupiah } from '../lib/pricingService'
 import { playButtonPop, playMascotChime } from '../lib/soundEffects'
 
-const emit = defineEmits(['select-plan', 'navigate-auth'])
+const emit = defineEmits(['select-plan', 'navigate-auth', 'payment-success'])
 
 // Toggle Bulanan vs Tahunan
 const isYearly = ref(false)
@@ -28,8 +32,8 @@ const toggleFaq = (index) => {
   openFaqIndex.value = openFaqIndex.value === index ? null : index
 }
 
-// Checkout Modal State
-const showCheckoutModal = ref(false)
+// Xendit Checkout Modal State
+const showXenditModal = ref(false)
 const selectedPlan = ref(null)
 
 const handleChoosePlan = (plan) => {
@@ -37,20 +41,35 @@ const handleChoosePlan = (plan) => {
   if (plan === 'free') {
     emit('navigate-auth', 'register', 'Daftar akun gratis sekarang untuk menikmati modul pembelajaran pertama!')
   } else {
-    selectedPlan.value = {
-      name: 'Inkluvia Premium',
-      price: isYearly.value ? 'Rp47.000' : 'Rp59.000',
-      period: isYearly.value ? '/bulan (ditagih tahunan)' : '/bulan',
-      savings: isYearly.value ? 'Hemat 20%' : null
+    // Jika belum login, arahkan ke login dulu agar pembayaran tersambung ke akunnya
+    if (!isAuthenticated.value) {
+      emit(
+        'navigate-auth',
+        'login',
+        'Silakan masuk atau buat akun terlebih dahulu untuk melanjutkan pembayaran Inkluvia Premium via Xendit Sandbox.'
+      )
+      return
     }
-    showCheckoutModal.value = true
+
+    const premium = pricingConfig.value.premiumTier
+    const amount = isYearly.value ? premium.yearlyPrice : premium.monthlyPrice
+    const interval = isYearly.value ? 'tahun' : 'bulan'
+
+    selectedPlan.value = {
+      id: isYearly.value ? 'premium-yearly' : 'premium-monthly',
+      name: premium.name,
+      amount,
+      formattedPrice: formatRupiah(amount),
+      interval,
+      savings: isYearly.value ? premium.discountBadge : null
+    }
+    showXenditModal.value = true
     playMascotChime()
   }
 }
 
-const handleProceedCheckout = () => {
-  showCheckoutModal.value = false
-  emit('navigate-auth', 'register', 'Lanjutkan pendaftaran untuk mengaktifkan akun Inkluvia Premium Anda!')
+const handleXenditSuccess = (paymentResult) => {
+  emit('payment-success', paymentResult)
 }
 
 const faqs = [
@@ -74,15 +93,34 @@ const faqs = [
 </script>
 
 <template>
-  <div class="w-full bg-transparent py-10 sm:py-16 px-4 sm:px-6 lg:px-10 space-y-16 relative overflow-hidden">
+  <div
+    class="w-full bg-transparent py-10 sm:py-16 px-4 sm:px-6 lg:px-10 space-y-16 relative overflow-hidden"
+    style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
+  >
     <!-- Subtle Soft Background Tints -->
-    <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#FFDC58]/08 blur-3xl pointer-events-none"></div>
-    <div class="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-[#3DA5FF]/08 blur-3xl pointer-events-none"></div>
-    <div class="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-[#FF74BC]/20 blur-3xl pointer-events-none"></div>
+    <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#FFDC58]/12 blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-[#3DA5FF]/12 blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-[#FF74BC]/15 blur-3xl pointer-events-none"></div>
 
-    <!-- Floating Doodles -->
-    <div class="absolute top-12 left-8 text-2xl text-[#FFDC58] pointer-events-none animate-bounce-subtle hidden sm:block">⭐</div>
-    <div class="absolute top-20 right-12 text-2xl text-[#FF7315] pointer-events-none animate-spin-slow hidden sm:block">✨</div>
+    <!-- Authentic Hand-drawn Doodles for Pricing Page -->
+    <div class="absolute top-10 left-8 sm:left-14 pointer-events-none select-none hidden sm:block -rotate-12 animate-bounce-subtle">
+      <DoodleOrnament name="star-outline" color="#FFDC58" :size="42" />
+    </div>
+    <div class="absolute top-12 right-10 sm:right-16 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow">
+      <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="48" />
+    </div>
+    <div class="absolute top-1/2 left-6 pointer-events-none select-none hidden xl:block animate-float-medium">
+      <DoodleOrnament name="dots-duo" :size="42" />
+    </div>
+    <div class="absolute top-1/2 right-6 pointer-events-none select-none hidden xl:block rotate-12">
+      <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+    </div>
+    <div class="absolute bottom-12 left-10 pointer-events-none select-none hidden md:block">
+      <DoodleOrnament name="squiggle" color="#FF7315" :size="68" />
+    </div>
+    <div class="absolute bottom-16 right-12 pointer-events-none select-none hidden sm:block animate-pulse-subtle">
+      <DoodleOrnament name="burst" color="#54AA1B" :size="32" />
+    </div>
 
     <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
 
@@ -120,8 +158,8 @@ const faqs = [
 
           <span :class="['text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition', isYearly ? 'text-[#FF7315]' : 'text-slate-400']">
             Bayar Tahunan
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
-              HEMAT 20% 🏷️
+            <span v-if="pricingConfig.premiumTier.discountBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
+              {{ pricingConfig.premiumTier.discountBadge }}
             </span>
           </span>
         </div>
@@ -136,28 +174,24 @@ const faqs = [
             <!-- Header -->
             <div class="space-y-2">
               <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-600">
-                PEMULA
+                {{ pricingConfig.freeTier.subtitle }}
               </span>
-              <h3 class="text-2xl font-black text-[#0F3261]">Free</h3>
+              <h3 class="text-2xl font-black text-[#0F3261]">{{ pricingConfig.freeTier.name }}</h3>
               <div class="flex items-baseline gap-1 pt-1">
-                <span class="text-4xl font-black text-[#0F3261]">Rp0</span>
-                <span class="text-xs font-bold text-slate-400">/selamanya</span>
+                <span class="text-4xl font-black text-[#0F3261]">{{ formatRupiah(pricingConfig.freeTier.price) }}</span>
+                <span class="text-xs font-bold text-slate-400">/{{ pricingConfig.freeTier.interval }}</span>
               </div>
             </div>
 
             <!-- Features Checklist -->
             <ul class="space-y-4 text-xs sm:text-sm text-slate-600 font-medium">
-              <li class="flex items-start gap-3">
+              <li
+                v-for="(feat, fIdx) in pricingConfig.freeTier.features"
+                :key="fIdx"
+                class="flex items-start gap-3"
+              >
                 <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                <span>Akses 1 materi modul dasar</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                <span>Standard Mode (Ceria & Suara)</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                <span>Fitur dasar pembelajaran</span>
+                <span>{{ feat }}</span>
               </li>
               <li class="flex items-start gap-3 opacity-50">
                 <Lock class="w-5 h-5 text-slate-300 shrink-0 mt-0.5" />
@@ -186,79 +220,92 @@ const faqs = [
           <!-- Popular Badge Tag -->
           <div class="absolute -top-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#FF7315] to-[#e86105] text-white px-5 py-1.5 rounded-full text-xs font-black tracking-wide shadow-md flex items-center gap-1.5 uppercase">
             <Star class="w-3.5 h-3.5 fill-current text-[#FFDC58]" />
-            <span>Paling Populer</span>
+            <span>{{ pricingConfig.premiumTier.popularBadge || 'Paling Populer' }}</span>
           </div>
 
           <div class="space-y-6 pt-2">
             <!-- Header -->
             <div class="space-y-2">
               <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-orange-100 text-[#FF7315]">
-                INKLUVIA PREMIUM
+                {{ pricingConfig.premiumTier.subtitle }}
               </span>
-              <h3 class="text-2xl font-black text-[#0F3261]">Inkluvia Premium</h3>
+              <h3 class="text-2xl font-black text-[#0F3261]">{{ pricingConfig.premiumTier.name }}</h3>
               <div class="flex items-baseline gap-1.5 pt-1">
                 <span class="text-4xl font-black text-[#FF7315]">
-                  {{ isYearly ? 'Rp47.000' : 'Rp59.000' }}
+                  {{ isYearly ? formatRupiah(Math.round(pricingConfig.premiumTier.yearlyPrice / 12)) : formatRupiah(pricingConfig.premiumTier.monthlyPrice) }}
                 </span>
                 <span class="text-xs font-bold text-slate-500">/bulan</span>
               </div>
               <p v-if="isYearly" class="text-[11px] font-extrabold text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-md inline-block">
-                Ditagih tahunan (Rp564.000 / tahun)
+                Ditagih tahunan ({{ formatRupiah(pricingConfig.premiumTier.yearlyPrice) }} / tahun)
               </p>
             </div>
 
             <!-- Features Checklist -->
             <ul class="space-y-3.5 text-xs sm:text-sm text-slate-700 font-bold">
-              <li class="flex items-start gap-3">
+              <li
+                v-for="(feat, fIdx) in pricingConfig.premiumTier.features"
+                :key="fIdx"
+                class="flex items-start gap-3"
+              >
                 <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Semua materi (20+ Modul Lengkap)</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Standard + Focus Mode (Bebas Distraksi)</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Worksheet Aktivitas Siap Cetak</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Aktivitas & Kuis Tambahan</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Evaluasi & Laporan Pembelajaran</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Panduan Pendidik & Orang Tua</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                <span>Materi Baru Setiap Bulan</span>
+                <span>{{ feat }}</span>
               </li>
             </ul>
           </div>
 
           <div>
             <button
+              v-if="currentUser?.isPro"
+              disabled
+              class="w-full py-4 px-6 rounded-full font-black text-sm flex items-center justify-center gap-2 cursor-default bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-900 shadow-md border-2 border-amber-400"
+            >
+              <span>👑 Paket PRO Sudah Aktif</span>
+            </button>
+            <button
+              v-else
               @click="handleChoosePlan('premium')"
               class="btn-tactile-orange w-full py-4 px-6 rounded-full font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-xl"
             >
-              <span>Mulai Premium</span>
+              <span>Beli via Xendit Sandbox</span>
               <ArrowRight class="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <!-- COLUMN 3: ARTWORK DIRECTLY ON BACKGROUND (NO CARD WRAPPER, NO DUPLICATE SPEECH BUBBLE) -->
+        <!-- COLUMN 3: ARTWORK DIRECTLY ON BACKGROUND WITH AUTHENTIC DOODLES -->
         <div class="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-4 relative py-4">
-          <!-- Illustration Image -->
-          <div class="w-full max-w-[360px] sm:max-w-[400px]">
+          <!-- Illustration Image with Hand-drawn Vector Doodles -->
+          <div class="w-full max-w-[360px] sm:max-w-[400px] relative">
+            <!-- Top Right: Looping Arrow -->
+            <div class="absolute -top-6 right-2 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow z-20">
+              <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="48" />
+            </div>
+
+            <!-- Top Left: Three-Ray Burst -->
+            <div class="absolute top-2 -left-3 pointer-events-none select-none hidden md:block -rotate-12 animate-pulse-subtle z-20">
+              <DoodleOrnament name="burst" color="#FF7315" :size="30" />
+            </div>
+
+            <!-- Mid Right: Floating Pastel Dots -->
+            <div class="absolute top-1/3 -right-4 pointer-events-none select-none hidden md:block animate-float-medium z-20">
+              <DoodleOrnament name="dots-cluster" :size="46" />
+            </div>
+
+            <!-- Bottom Right: Star Outline -->
+            <div class="absolute -bottom-3 right-6 pointer-events-none select-none hidden sm:block -rotate-6 animate-bounce-subtle z-20">
+              <DoodleOrnament name="star-outline" color="#FFDC58" :size="38" />
+            </div>
+
+            <!-- Bottom Left: Squiggle -->
+            <div class="absolute -bottom-2 left-2 pointer-events-none select-none hidden sm:block rotate-3 z-20">
+              <DoodleOrnament name="squiggle" color="#FF7315" :size="60" />
+            </div>
+
             <img
               src="/Pricing_element.png"
               alt="Anak belajar gembira bersama Inkluvia"
-              class="w-full h-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-xl"
+              class="w-full h-auto object-contain hover:scale-105 transition-transform duration-500 drop-shadow-xl relative z-10"
             />
           </div>
 
@@ -310,53 +357,12 @@ const faqs = [
 
     </div>
 
-    <!-- ==================== CHECKOUT SIMULATION MODAL ==================== -->
-    <Transition name="dropdown">
-      <div v-if="showCheckoutModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl border-2 border-orange-200 relative animate-bubble-pop">
-          <!-- Close Button -->
-          <button
-            @click="showCheckoutModal = false"
-            class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-sm cursor-pointer"
-          >
-            ✕
-          </button>
-
-          <!-- Modal Content -->
-          <div class="text-center space-y-3">
-            <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#FF7315] to-[#e86105] text-white flex items-center justify-center mx-auto shadow-lg shadow-orange-500/30 text-2xl">
-              🎁
-            </div>
-            <span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-[#FF7315] text-xs font-black uppercase">
-              AKTIVASI INKLUVIA PREMIUM
-            </span>
-            <h3 class="text-xl font-black text-[#0F3261]">
-              {{ selectedPlan?.name }}
-            </h3>
-            <div class="p-4 rounded-2xl bg-orange-50 border border-orange-100 text-center space-y-1">
-              <p class="text-2xl font-black text-[#FF7315]">{{ selectedPlan?.price }} <span class="text-xs font-bold text-slate-500">{{ selectedPlan?.period }}</span></p>
-              <p v-if="selectedPlan?.savings" class="text-xs font-extrabold text-amber-700 bg-amber-200/60 px-2 py-0.5 rounded-md inline-block">
-                {{ selectedPlan?.savings }}
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-3 pt-2">
-            <button
-              @click="handleProceedCheckout"
-              class="btn-tactile-orange w-full py-3.5 font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-            >
-              <span>Daftar Akun & Aktifkan Premium ➔</span>
-            </button>
-            <button
-              @click="showCheckoutModal = false"
-              class="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition cursor-pointer"
-            >
-              Kembali
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- ==================== XENDIT SANDBOX CHECKOUT MODAL ==================== -->
+    <XenditCheckoutModal
+      :show="showXenditModal"
+      :plan="selectedPlan"
+      @close="showXenditModal = false"
+      @success="handleXenditSuccess"
+    />
   </div>
 </template>

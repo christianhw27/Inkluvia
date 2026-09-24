@@ -6,17 +6,25 @@ import {
 import { currentUser, isAdmin, logoutUser } from '../lib/authService'
 import { uploadVideo, uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
 import {
+  pricingConfig,
+  savePricingConfig,
+  resetPricingConfig,
+  formatRupiah
+} from '../lib/pricingService'
+import { playMascotChime } from '../lib/soundEffects'
+import {
   LayoutDashboard, BookOpen, Video, Settings, LogOut, Plus, Trash2, Edit3, Eye,
   X, Sun, CheckCircle2, UploadCloud, ShieldAlert, Search, Bell, ChevronRight,
   FileVideo, CloudUpload, RefreshCw, Sparkles, TrendingUp, Users, Clock,
   ArrowUpRight, MoreVertical, Filter, Download, AlertCircle, Menu, ChevronDown,
-  ArrowLeft, Save, ImagePlus, ListVideo, Tag, AlignLeft, Layers, HelpCircle
+  ArrowLeft, Save, ImagePlus, ListVideo, Tag, AlignLeft, Layers, HelpCircle,
+  Percent, DollarSign, RotateCcw, CreditCard
 } from '@lucide/vue'
 
 const emit = defineEmits(['previewMateri', 'backToApp', 'openAuth'])
 
 // Sidebar nav state
-const activePage = ref('dashboard') // 'dashboard' | 'materi' | 'upload' | 'settings'
+const activePage = ref('dashboard') // 'dashboard' | 'materi' | 'video' | 'pricing' | 'settings'
 const sidebarCollapsed = ref(false)
 
 // Modal state
@@ -308,11 +316,58 @@ const filteredMateri = computed(() => {
   return list
 })
 
+// Pricing Management State & Methods
+const pricingForm = ref(JSON.parse(JSON.stringify(pricingConfig.value)))
+const pricingSavedAlert = ref(false)
+const newFeatureInput = ref('')
+
+const handleSavePricing = () => {
+  const res = savePricingConfig(pricingForm.value)
+  if (res.success) {
+    pricingSavedAlert.value = true
+    playMascotChime()
+    setTimeout(() => {
+      pricingSavedAlert.value = false
+    }, 4000)
+  }
+}
+
+const handleResetPricing = () => {
+  if (confirm('Kembalikan konfigurasi harga dan fitur ke default standar?')) {
+    resetPricingConfig()
+    pricingForm.value = JSON.parse(JSON.stringify(pricingConfig.value))
+    pricingSavedAlert.value = true
+    playMascotChime()
+    setTimeout(() => {
+      pricingSavedAlert.value = false
+    }, 3000)
+  }
+}
+
+const autoCalculateYearlyPrice = () => {
+  const monthly = Number(pricingForm.value.premiumTier.monthlyPrice) || 59000
+  const discount = Number(pricingForm.value.premiumTier.discountPercent) || 0
+  const yearly = Math.round(monthly * 12 * (1 - discount / 100))
+  pricingForm.value.premiumTier.yearlyPrice = yearly
+}
+
+const addPremiumFeature = () => {
+  if (newFeatureInput.value.trim()) {
+    pricingForm.value.premiumTier.features.push(newFeatureInput.value.trim())
+    newFeatureInput.value = ''
+  }
+}
+
+const removePremiumFeature = (idx) => {
+  pricingForm.value.premiumTier.features.splice(idx, 1)
+}
+
 // Nav items
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'materi', label: 'Konten Materi', icon: BookOpen },
   { key: 'video', label: 'Manajemen Video', icon: FileVideo },
+  { key: 'pricing', label: 'Paket & Harga', icon: Tag },
   { key: 'settings', label: 'Pengaturan', icon: Settings },
 ]
 </script>
@@ -1413,6 +1468,351 @@ const navItems = [
                 <FileVideo class="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <p class="text-slate-400 text-sm">Belum ada materi. Tambah materi untuk mengelola video.</p>
               </div>
+            </div>
+          </div>
+
+          <!-- ============================================================ -->
+          <!-- PAGE: PRICING MANAGEMENT (MANAJEMEN PAKET & HARGA) -->
+          <!-- ============================================================ -->
+          <div v-else-if="activePage === 'pricing'" class="p-6 space-y-6">
+            <!-- Header & Action Row -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 class="text-2xl font-black text-[#0F3261] flex items-center gap-2.5">
+                  <Tag class="w-6 h-6 text-[#FF7315]" />
+                  <span>Manajemen Paket & Harga Langganan</span>
+                </h1>
+                <p class="text-slate-500 text-sm mt-0.5">
+                  Kelola tarif Inkluvia Premium, persentase diskon tahunan, promo badge, dan sinkronisasi pembayaran Xendit.
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button
+                  @click="handleResetPricing"
+                  class="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <RotateCcw class="w-3.5 h-3.5" />
+                  <span>Reset Default</span>
+                </button>
+
+                <button
+                  @click="handleSavePricing"
+                  class="px-5 py-2 rounded-xl bg-gradient-to-r from-[#FF7315] to-[#E86105] hover:from-[#ff812d] hover:to-[#f06809] text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md hover:scale-102"
+                >
+                  <Save class="w-4 h-4" />
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Success Alert Banner -->
+            <transition name="fade">
+              <div
+                v-if="pricingSavedAlert"
+                class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between gap-3 shadow-xs"
+              >
+                <div class="flex items-center gap-2.5">
+                  <CheckCircle2 class="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>Perubahan harga berhasil disimpan dan langsung tersinkronkan ke Tab Harga serta invoice Xendit Sandbox!</span>
+                </div>
+                <button @click="pricingSavedAlert = false" class="text-emerald-600 hover:text-emerald-800 font-black cursor-pointer">✕</button>
+              </div>
+            </transition>
+
+            <!-- Xendit Live Sync Notification Banner -->
+            <div class="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-white text-[#0F3261] border border-blue-100 flex items-center justify-center font-bold text-lg shadow-2xs shrink-0">
+                  💳
+                </div>
+                <div>
+                  <h4 class="text-xs font-black text-[#0F3261] uppercase tracking-wide flex items-center gap-1.5">
+                    <span>Sinkronisasi Otomatis Gateway Xendit</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  </h4>
+                  <p class="text-xs text-slate-600 mt-0.5">
+                    Nominal harga yang Anda tentukan di bawah akan langsung diterbitkan sebagai tagihan resmi saat user melakukan checkout.
+                  </p>
+                </div>
+              </div>
+              <span class="text-[11px] font-mono font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs hidden sm:inline-block">
+                Mode Sandbox Aktif
+              </span>
+            </div>
+
+            <!-- Two-Column Grid: Form Editor (Left) & Live Student Preview (Right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              
+              <!-- LEFT COLUMN: PRICING FORM (7 Cols) -->
+              <div class="lg:col-span-7 space-y-6">
+                
+                <!-- Card 1: Pengaturan Harga & Diskon -->
+                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 sm:p-6 space-y-5">
+                  <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+                    <div>
+                      <h3 class="font-black text-[#0F3261] text-base">Tarif Langganan Inkluvia Premium</h3>
+                      <p class="text-xs text-slate-400">Atur nominal harga bulanan dan diskon tahunan</p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-orange-50 text-[#FF7315] border border-orange-200">
+                      IDR (Rupiah)
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Monthly Price Input -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-black text-[#0F3261] uppercase tracking-wider">
+                        Harga Bulanan (Rp):
+                      </label>
+                      <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                        <input
+                          v-model.number="pricingForm.premiumTier.monthlyPrice"
+                          @input="autoCalculateYearlyPrice"
+                          type="number"
+                          step="1000"
+                          min="1000"
+                          class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#FF7315] focus:bg-white rounded-xl text-sm font-bold text-slate-800 focus:outline-none transition"
+                        />
+                      </div>
+                      <p class="text-[11px] text-slate-400 font-mono">
+                        {{ formatRupiah(pricingForm.premiumTier.monthlyPrice) }} / bulan
+                      </p>
+                    </div>
+
+                    <!-- Discount Percentage Input -->
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-black text-[#0F3261] uppercase tracking-wider">
+                        Diskon Tahunan (%):
+                      </label>
+                      <div class="relative">
+                        <input
+                          v-model.number="pricingForm.premiumTier.discountPercent"
+                          @input="autoCalculateYearlyPrice"
+                          type="number"
+                          min="0"
+                          max="100"
+                          class="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#FF7315] focus:bg-white rounded-xl text-sm font-bold text-slate-800 focus:outline-none transition"
+                        />
+                        <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                      </div>
+                      <p class="text-[11px] text-slate-400">
+                        Diskon otomatis untuk pembayaran tahunan
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Yearly Price Input -->
+                  <div class="p-4 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <label class="text-xs font-black text-amber-900 uppercase tracking-wider">
+                        Total Ditagih Tahunan (Rp / Tahun):
+                      </label>
+                      <button
+                        @click="autoCalculateYearlyPrice"
+                        class="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                      >
+                        ⚡ Hitung dari Diskon
+                      </button>
+                    </div>
+
+                    <div class="relative">
+                      <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                      <input
+                        v-model.number="pricingForm.premiumTier.yearlyPrice"
+                        type="number"
+                        step="1000"
+                        min="1000"
+                        class="w-full pl-10 pr-4 py-2.5 bg-white border border-amber-300 focus:border-[#FF7315] rounded-xl text-sm font-black text-slate-800 focus:outline-none transition shadow-2xs"
+                      />
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] text-amber-800">
+                      <span>Setara per bulan: <strong>{{ formatRupiah(Math.round(pricingForm.premiumTier.yearlyPrice / 12)) }}</strong> /bln</span>
+                      <span>Hemat: <strong>{{ formatRupiah((pricingForm.premiumTier.monthlyPrice * 12) - pricingForm.premiumTier.yearlyPrice) }}</strong></span>
+                    </div>
+                  </div>
+
+                  <!-- Promo Badges -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-black text-[#0F3261] uppercase tracking-wider">
+                        Teks Badge Diskon:
+                      </label>
+                      <input
+                        v-model="pricingForm.premiumTier.discountBadge"
+                        type="text"
+                        placeholder="Contoh: HEMAT 20% 🏷️"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#FF7315] focus:bg-white rounded-xl text-xs font-bold text-slate-800 focus:outline-none transition"
+                      />
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-black text-[#0F3261] uppercase tracking-wider">
+                        Teks Tag Populer:
+                      </label>
+                      <input
+                        v-model="pricingForm.premiumTier.popularBadge"
+                        type="text"
+                        placeholder="Contoh: Paling Populer"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#FF7315] focus:bg-white rounded-xl text-xs font-bold text-slate-800 focus:outline-none transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 2: Kelola Fitur-Fitur Paket Premium -->
+                <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 sm:p-6 space-y-4">
+                  <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+                    <div>
+                      <h3 class="font-black text-[#0F3261] text-base">Daftar Fitur Paket Premium</h3>
+                      <p class="text-xs text-slate-400">Poin keunggulan yang ditampilkan pada checklist kartu langganan</p>
+                    </div>
+                    <span class="text-xs font-mono font-bold text-slate-500">
+                      {{ pricingForm.premiumTier.features.length }} Fitur
+                    </span>
+                  </div>
+
+                  <!-- Features List -->
+                  <div class="space-y-2">
+                    <div
+                      v-for="(feat, idx) in pricingForm.premiumTier.features"
+                      :key="idx"
+                      class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 text-xs text-slate-700 font-semibold group transition"
+                    >
+                      <div class="flex items-center gap-2 flex-1">
+                        <CheckCircle2 class="w-4 h-4 text-[#FF7315] shrink-0" />
+                        <input
+                          v-model="pricingForm.premiumTier.features[idx]"
+                          type="text"
+                          class="w-full bg-transparent focus:bg-white px-2 py-1 rounded border border-transparent focus:border-slate-300 focus:outline-none text-xs text-slate-800 font-semibold"
+                        />
+                      </div>
+                      <button
+                        @click="removePremiumFeature(idx)"
+                        title="Hapus fitur"
+                        class="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition cursor-pointer"
+                      >
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Add Feature Input -->
+                  <div class="flex items-center gap-2 pt-2">
+                    <input
+                      v-model="newFeatureInput"
+                      @keydown.enter.prevent="addPremiumFeature"
+                      type="text"
+                      placeholder="Ketik fitur baru lalu tekan Tambah..."
+                      class="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#FF7315] focus:bg-white rounded-xl text-xs font-medium text-slate-800 focus:outline-none transition"
+                    />
+                    <button
+                      @click="addPremiumFeature"
+                      class="px-4 py-2.5 rounded-xl bg-[#0F3261] hover:bg-[#154687] text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <Plus class="w-3.5 h-3.5" />
+                      <span>Tambah</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Bottom Save Actions -->
+                <div class="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    @click="handleResetPricing"
+                    class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+                  >
+                    Batal / Reset
+                  </button>
+
+                  <button
+                    @click="handleSavePricing"
+                    class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#FF7315] to-[#E86105] hover:from-[#ff812d] hover:to-[#f06809] text-white text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-md hover:scale-102"
+                  >
+                    <Save class="w-4 h-4" />
+                    <span>Simpan Perubahan Harga</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- RIGHT COLUMN: LIVE PREVIEW CARD (5 Cols) -->
+              <div class="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-black text-[#0F3261] uppercase tracking-wider flex items-center gap-1.5">
+                    <Eye class="w-4 h-4 text-[#3587CE]" />
+                    <span>Live Preview Siswa</span>
+                  </span>
+                  <span class="text-slate-400 text-[11px]">Tampilan realtime tab Harga</span>
+                </div>
+
+                <!-- Replicated Preview Card -->
+                <div class="bg-gradient-to-b from-[#FFFDF9] to-amber-50/40 rounded-3xl p-6 sm:p-7 border-4 border-[#FF7315]/80 shadow-xl space-y-6 relative overflow-hidden">
+                  <!-- Tag Populer -->
+                  <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-[#FF7315] text-white shadow-xs uppercase">
+                    <Sparkles class="w-3 h-3 text-[#FFDC58]" />
+                    <span>{{ pricingForm.premiumTier.popularBadge || 'Paling Populer' }}</span>
+                  </div>
+
+                  <div class="space-y-2">
+                    <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-[#FF7315]">
+                      {{ pricingForm.premiumTier.subtitle }}
+                    </span>
+                    <h3 class="text-xl font-black text-[#0F3261]">{{ pricingForm.premiumTier.name }}</h3>
+                    
+                    <div class="flex items-baseline gap-1 pt-1">
+                      <span class="text-3xl font-black text-[#FF7315]">
+                        {{ formatRupiah(pricingForm.premiumTier.monthlyPrice) }}
+                      </span>
+                      <span class="text-xs font-bold text-slate-500">/bulan</span>
+                    </div>
+
+                    <div class="pt-1">
+                      <span class="inline-block text-[11px] font-extrabold text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-md">
+                        {{ pricingForm.premiumTier.discountBadge || 'HEMAT' }} • Tahunan: {{ formatRupiah(pricingForm.premiumTier.yearlyPrice) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Checklist Preview -->
+                  <div class="space-y-2.5 pt-2 border-t border-slate-100">
+                    <div
+                      v-for="(feat, fIdx) in pricingForm.premiumTier.features.slice(0, 6)"
+                      :key="fIdx"
+                      class="flex items-start gap-2.5 text-xs text-slate-700 font-bold"
+                    >
+                      <CheckCircle2 class="w-4 h-4 text-[#FF7315] shrink-0 mt-0.5" />
+                      <span class="truncate">{{ feat }}</span>
+                    </div>
+                    <div v-if="pricingForm.premiumTier.features.length > 6" class="text-[11px] text-slate-400 font-semibold pl-6">
+                      + {{ pricingForm.premiumTier.features.length - 6 }} fitur lainnya
+                    </div>
+                  </div>
+
+                  <!-- Preview Button -->
+                  <div class="pt-2">
+                    <button
+                      disabled
+                      class="btn-tactile-orange w-full py-3 rounded-full font-black text-xs flex items-center justify-center gap-1.5 cursor-default opacity-90 shadow-md"
+                    >
+                      <span>Beli via Xendit Sandbox ➔</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Simulation Guide Box -->
+                <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2 text-xs text-slate-600">
+                  <h4 class="font-black text-[#0F3261] flex items-center gap-1.5">
+                    <span>💡 Tips Administrator:</span>
+                  </h4>
+                  <p class="leading-relaxed">
+                    Jika harga bulanan diubah (misalnya menjadi <strong>Rp39.000</strong>), klik tombol <strong>"Simpan Perubahan"</strong>. 
+                    Tab Harga siswa dan jumlah invoice Xendit akan langsung terbarui secara instan.
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
 

@@ -17,6 +17,7 @@ import {
   Gamepad2,
   ArrowRight
 } from '@lucide/vue'
+import DoodleOrnament from './DoodleOrnament.vue'
 
 const props = defineProps({
   initialTab: { type: String, default: 'login' },
@@ -101,8 +102,32 @@ const fillDemo = (demoEmail, demoPass) => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] w-full flex items-center justify-center p-4 sm:p-6 lg:p-10 bg-[#F4F8FD]">
-    <div class="w-full max-w-5xl bg-white rounded-3xl sm:rounded-[36px] border border-slate-100 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+  <div
+    class="min-h-[calc(100vh-4rem)] w-full flex items-center justify-center p-4 sm:p-6 lg:p-10 bg-[#F4F8FD] relative overflow-hidden"
+    style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
+  >
+    <!-- Background Ambient Glow Blobs -->
+    <div class="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#FFDC58]/15 blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-[#3DA5FF]/15 blur-3xl pointer-events-none"></div>
+
+    <!-- Authentic Floating Doodles Around Auth Card -->
+    <div class="absolute top-10 left-10 pointer-events-none select-none hidden sm:block -rotate-12 animate-bounce-subtle">
+      <DoodleOrnament name="star-outline" color="#FFDC58" :size="42" />
+    </div>
+    <div class="absolute top-12 right-12 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow">
+      <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="48" />
+    </div>
+    <div class="absolute bottom-10 left-12 pointer-events-none select-none hidden md:block">
+      <DoodleOrnament name="squiggle" color="#FF7315" :size="65" />
+    </div>
+    <div class="absolute bottom-12 right-12 pointer-events-none select-none hidden sm:block rotate-6 animate-pulse-subtle">
+      <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+    </div>
+    <div class="absolute top-1/2 left-6 pointer-events-none select-none hidden xl:block animate-float-medium">
+      <DoodleOrnament name="dots-duo" :size="42" />
+    </div>
+
+    <div class="w-full max-w-5xl bg-white rounded-3xl sm:rounded-[36px] border border-slate-100 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
       
       <!-- ================= SISI KIRI: BRANDING & HIGHLIGHT (Desktop) ================= -->
       <div

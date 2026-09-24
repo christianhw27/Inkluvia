@@ -9,6 +9,8 @@ import {
   Clock,
   Video
 } from '@lucide/vue'
+import DoodleOrnament from './DoodleOrnament.vue'
+import { currentUser, isAdmin } from '../lib/authService'
 import { playButtonPop } from '../lib/soundEffects'
 
 const props = defineProps({
@@ -54,8 +56,35 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="w-full flex flex-col flex-1 pt-4 sm:pt-6 pb-12 px-4 sm:px-6 lg:px-10 space-y-4 sm:space-y-5">
-    <div class="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-5">
+  <div
+    class="w-full flex flex-col flex-1 pt-4 sm:pt-6 pb-12 px-4 sm:px-6 lg:px-10 space-y-4 sm:space-y-5 relative overflow-hidden"
+    style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
+  >
+    <!-- Background Ambient Glow Blobs -->
+    <div class="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-[#FFDC58]/12 blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-[#3DA5FF]/10 blur-3xl pointer-events-none"></div>
+
+    <!-- Authentic Floating Doodles for Materi Page -->
+    <div class="absolute top-8 left-8 pointer-events-none select-none hidden sm:block -rotate-12 animate-bounce-subtle">
+      <DoodleOrnament name="star-outline" color="#FFDC58" :size="40" />
+    </div>
+    <div class="absolute top-8 right-12 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow">
+      <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="48" />
+    </div>
+    <div class="absolute top-1/2 left-4 pointer-events-none select-none hidden xl:block animate-float-medium">
+      <DoodleOrnament name="dots-duo" :size="42" />
+    </div>
+    <div class="absolute top-1/2 right-6 pointer-events-none select-none hidden xl:block rotate-12">
+      <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+    </div>
+    <div class="absolute bottom-8 left-8 pointer-events-none select-none hidden md:block">
+      <DoodleOrnament name="squiggle" color="#FF7315" :size="65" />
+    </div>
+    <div class="absolute bottom-8 right-10 pointer-events-none select-none hidden sm:block animate-pulse-subtle">
+      <DoodleOrnament name="burst" color="#54AA1B" :size="32" />
+    </div>
+
+    <div class="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-5 relative z-10">
 
       <!-- ==================== 1. AREA HEADER HALAMAN ==================== -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center px-1 py-1 relative">
@@ -70,10 +99,17 @@ const resetFilters = () => {
           </p>
         </div>
 
-        <!-- Banner Artwork Right -->
-        <div class="lg:col-span-4 flex justify-center lg:justify-end pointer-events-none relative">
-          <div class="absolute -top-3 left-4 sm:left-12 text-lg text-[#FFDC58] animate-bounce-subtle">⭐</div>
-          <div class="absolute -bottom-1 right-2 text-base text-[#FF7315]">✨</div>
+        <!-- Banner Artwork Right with Hand-drawn Vector Doodles -->
+        <div class="lg:col-span-4 flex justify-center lg:justify-end pointer-events-none relative select-none">
+          <div class="absolute -top-4 left-4 sm:left-12 -rotate-12 animate-bounce-subtle">
+            <DoodleOrnament name="star-outline" color="#FFDC58" :size="32" />
+          </div>
+          <div class="absolute -bottom-2 right-2 animate-pulse-subtle">
+            <DoodleOrnament name="burst" color="#3DA5FF" :size="26" />
+          </div>
+          <div class="absolute -top-5 right-8 rotate-12 hidden sm:block">
+            <DoodleOrnament name="heart-outline" color="#FF74BC" :size="28" />
+          </div>
 
           <img
             src="/Banner_Materi.jpg"
@@ -190,8 +226,18 @@ const resetFilters = () => {
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <!-- Badge Gratis / Pro -->
-              <span class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black text-white shadow-md" style="background: linear-gradient(135deg, #FF7315, #E86105);">
-                {{ item.badge || 'Gratis' }}
+              <span
+                v-if="(item.badge || '').toLowerCase() === 'pro' && (currentUser?.isPro || isAdmin)"
+                class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black text-slate-900 shadow-md bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 border border-amber-300 flex items-center gap-1"
+              >
+                <span>👑 PRO (AKSES AKTIF)</span>
+              </span>
+              <span
+                v-else
+                class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black text-white shadow-md"
+                :style="(item.badge || '').toLowerCase() === 'pro' ? 'background: linear-gradient(135deg, #d97706, #b45309);' : 'background: linear-gradient(135deg, #10b981, #059669);'"
+              >
+                {{ (item.badge || '').toLowerCase() === 'pro' ? '🔒 PRO' : '⭐ GRATIS' }}
               </span>
             </div>
 
@@ -257,7 +303,8 @@ const resetFilters = () => {
                   @click="emit('openDetail', item); playButtonPop()"
                   class="btn-tactile-orange px-6 py-3 text-xs font-extrabold flex items-center gap-2 cursor-pointer shrink-0 shadow-md"
                 >
-                  <span>Mulai Petualangan</span>
+                  <span v-if="(item.badge || '').toLowerCase() === 'pro' && (currentUser?.isPro || isAdmin)">Mulai Materi PRO ⭐</span>
+                  <span v-else>Mulai Petualangan</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>
               </div>

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 
-const STORAGE_KEY = 'inkluvia_materi_list_v2'
+const STORAGE_KEY = 'inkluvia_materi_list_v3'
 
 const initialMateri = [
   {
@@ -76,6 +76,153 @@ const initialMateri = [
             'Mencair',
             'Menyublim'
           ],
+          correctOptionIndex: 0
+        }
+      ]
+    }
+  },
+  {
+    id: 'materi-2',
+    title: 'Berhitung Bersama Sahabat Hutan',
+    jenjang: 'SD',
+    mataPelajaran: 'Matematika',
+    level: 'Matematika • Kelas I • Fase A',
+    badge: 'Pro',
+    image: '/Banner_Materi.jpg',
+    description: 'Memahami konsep penjumlahan dasar melalui animasi buah-buahan dan benda sekitar.',
+    types: ['Visual Interaktif', 'Sentuhan Ringan'],
+    duration: '± 5 menit',
+    activityType: 'Video + Aktivitas',
+    learningOptions: '4 Mode Belajar (Standar, Slow, High Contrast, Focus)',
+    learningPoints: [
+      { id: 'lp-2-1', title: 'Mengenal Angka 1-10' },
+      { id: 'lp-2-2', title: 'Penjumlahan Bergambar' }
+    ],
+    standardContent: {
+      title: 'Berhitung Bersama Sahabat Hutan (Standar)',
+      text: 'Ayo berhitung bersama kelinci dan tupai ceria di hutan ajaib!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    },
+    slowContent: {
+      title: 'Berhitung Bersama Sahabat Hutan (Slow)',
+      text: 'Satu apel... ditambah satu apel... menjadi dua apel.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+    },
+    highContrastContent: {
+      title: 'PENJUMLAHAN DASAR',
+      text: '1 + 1 = 2. AYO BERHITUNG BERSAMA.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    },
+    focusContent: {
+      title: 'Konsep Angka',
+      text: '1 + 1 = 2. Fokus pada jumlah buah.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    },
+    assessment: {
+      title: 'Kuis Berhitung Ceria',
+      questions: [
+        {
+          id: 'q-2-1',
+          questionText: 'Berapa hasil dari 2 apel ditambah 1 apel?',
+          options: ['2 apel', '3 apel', '4 apel', '5 apel'],
+          correctOptionIndex: 1
+        }
+      ]
+    }
+  },
+  {
+    id: 'materi-3',
+    title: 'Mengenal Tata Surya & Planet Ajaib',
+    jenjang: 'SMP',
+    mataPelajaran: 'IPA',
+    level: 'IPA • Kelas VII • Fase D',
+    badge: 'Gratis',
+    image: '/Banner_Materi.jpg',
+    description: 'Menjelajahi keajaiban matahari, bumi, dan planet-planet di galaksi bimasakti.',
+    types: ['Video 3D', 'Eksplorasi Luar Angkasa'],
+    duration: '± 6 menit',
+    activityType: 'Video + Kuis Interaktif',
+    learningOptions: '4 Mode Belajar (Standar, Slow, High Contrast, Focus)',
+    learningPoints: [
+      { id: 'lp-3-1', title: 'Matahari sebagai Pusat Tata Surya' },
+      { id: 'lp-3-2', title: 'Planet Dalam & Luar' }
+    ],
+    standardContent: {
+      title: 'Mengenal Tata Surya & Planet Ajaib (Standar)',
+      text: 'Selamat datang di antariksa! Mari kita terbang mengelilingi 8 planet yang mengorbit matahari.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    },
+    slowContent: {
+      title: 'Mengenal Tata Surya & Planet Ajaib (Slow)',
+      text: 'Matahari adalah bintang di pusat tata surya kita... Planet berputar mengelilinginya.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+    },
+    highContrastContent: {
+      title: 'SISTEM TATA SURYA',
+      text: 'MATAHARI -> MERKURIUS -> VENUS -> BUMI -> MARS -> JUPITER -> SATURNUS -> URANUS -> NEPTUNUS.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    },
+    focusContent: {
+      title: 'Tata Surya Inti',
+      text: 'Matahari adalah pusat. Planet-planet mengitari matahari secara teratur.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    },
+    assessment: {
+      title: 'Kuis Cepat Tata Surya',
+      questions: [
+        {
+          id: 'q-3-1',
+          questionText: 'Planet terdekat dari matahari adalah...',
+          options: ['Merkurius', 'Venus', 'Bumi', 'Mars'],
+          correctOptionIndex: 0
+        }
+      ]
+    }
+  },
+  {
+    id: 'materi-4',
+    title: 'Dunia Mikroskopis: Sel & Kehidupan',
+    jenjang: 'SMA',
+    mataPelajaran: 'Biologi',
+    level: 'Biologi • Kelas X • Fase E',
+    badge: 'Pro',
+    image: '/Banner_Materi.jpg',
+    description: 'Membedah unit terkecil kehidupan: struktur membran, nukleus, dan mitokondria.',
+    types: ['Mikroskop Virtual', 'Visual 3D'],
+    duration: '± 7 menit',
+    activityType: 'Simulasi Sel Virtual',
+    learningOptions: '4 Mode Belajar (Standar, Slow, High Contrast, Focus)',
+    learningPoints: [
+      { id: 'lp-4-1', title: 'Struktur Membran & Sitoplasma' },
+      { id: 'lp-4-2', title: 'Perbedaan Sel Hewan & Tumbuhan' }
+    ],
+    standardContent: {
+      title: 'Dunia Mikroskopis: Sel & Kehidupan (Standar)',
+      text: 'Semua makhluk hidup tersusun dari unit dasar bernama sel. Mari kita selami bagian dalamnya!',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    },
+    slowContent: {
+      title: 'Dunia Mikroskopis: Sel & Kehidupan (Slow)',
+      text: 'Sel adalah unit terkecil makhluk hidup... memiliki membran luar dan inti sel.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+    },
+    highContrastContent: {
+      title: 'STRUKTUR SEL DASAR',
+      text: 'MEMBRAN SEL -> SITOPLASMA -> INTI SEL (NUKLEUS) -> MITOKONDRIA.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    },
+    focusContent: {
+      title: 'Konsep Sel',
+      text: 'Sel adalah penyusun makhluk hidup. Mengatur energi dan kehidupan.',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+    },
+    assessment: {
+      title: 'Asesmen Struktur Sel',
+      questions: [
+        {
+          id: 'q-4-1',
+          questionText: 'Organel sel yang berfungsi sebagai pusat penghasil energi sel adalah...',
+          options: ['Mitokondria', 'Ribosom', 'Retikulum Endoplasma', 'Vakuola'],
           correctOptionIndex: 0
         }
       ]

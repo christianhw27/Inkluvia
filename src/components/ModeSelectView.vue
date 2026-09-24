@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { ArrowLeft, ArrowRight, Check } from '@lucide/vue'
+import DoodleOrnament from './DoodleOrnament.vue'
 
 const props = defineProps({
   materi: {
@@ -42,12 +43,29 @@ const handleContinue = () => {
       </div>
 
       <!-- Center Content: Title & Mode Cards -->
-      <div class="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100/90 shadow-xl text-center space-y-8">
+      <div class="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100/90 shadow-xl text-center space-y-8 relative overflow-hidden">
+        <!-- Floating Subtle Doodles -->
+        <div class="absolute top-6 left-8 pointer-events-none select-none hidden sm:block -rotate-6 animate-bounce-subtle">
+          <DoodleOrnament name="star-outline" color="#FFDC58" :size="38" />
+        </div>
+        <div class="absolute top-6 right-8 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow">
+          <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="46" />
+        </div>
+        <div class="absolute bottom-6 left-8 pointer-events-none select-none hidden md:block">
+          <DoodleOrnament name="squiggle" color="#FF74BC" :size="60" />
+        </div>
+        <div class="absolute bottom-6 right-8 pointer-events-none select-none hidden md:block animate-float-medium">
+          <DoodleOrnament name="dots-duo" :size="40" />
+        </div>
+
         <!-- Heading -->
-        <div class="space-y-1.5 max-w-lg mx-auto">
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-[#0F3261] tracking-tight">
-            Pilih Cara Belajarmu!
-          </h1>
+        <div class="space-y-1.5 max-w-lg mx-auto relative z-10">
+          <div class="inline-flex items-center justify-center gap-1.5">
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#0F3261] tracking-tight">
+              Pilih Cara Belajarmu!
+            </h1>
+            <DoodleOrnament name="burst" color="#3DA5FF" :size="26" class="pointer-events-none animate-pulse-subtle" />
+          </div>
           <p class="text-xs sm:text-sm text-slate-500 font-medium">
             Kamu bisa memilih mode belajar sesuai dengan kebutuhanmu.
           </p>
@@ -128,7 +146,7 @@ const handleContinue = () => {
             <ul class="text-[11px] text-slate-600 space-y-1 text-left max-w-xs mx-auto">
               <li class="flex items-start gap-1.5">
                 <Check class="w-3.5 h-3.5 text-purple-600 shrink-0 mt-0.5" />
-                <span>Video & audio diputar 0.75x lebih santai.</span>
+                <span>Penyampaian materi terukur & lebih santai.</span>
               </li>
               <li class="flex items-start gap-1.5">
                 <Check class="w-3.5 h-3.5 text-purple-600 shrink-0 mt-0.5" />

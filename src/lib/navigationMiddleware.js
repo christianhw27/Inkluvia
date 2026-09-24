@@ -12,7 +12,8 @@ export const PROTECTED_ROUTES = [
   'materi',
   'materi-detail',
   'mode-select',
-  'learning-player'
+  'learning-player',
+  'settings'
 ]
 
 export const ADMIN_ROUTES = ['admin']

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   Search,
   ArrowRight,
@@ -29,7 +29,9 @@ import {
   CheckCircle2,
   FileText,
   Check,
-  Brain
+  Brain,
+  Menu,
+  X
 } from '@lucide/vue'
 import MateriView from './components/MateriView.vue'
 import MateriDetailView from './components/MateriDetailView.vue'
@@ -38,8 +40,9 @@ import LearningPlayerView from './components/LearningPlayerView.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 import AuthView from './components/AuthView.vue'
 import PricingView from './components/PricingView.vue'
-import SettingsModal from './components/SettingsModal.vue'
-import { materiList, selectedMateri } from './lib/materiService'
+import SettingsView from './components/SettingsView.vue'
+import DoodleOrnament from './components/DoodleOrnament.vue'
+import { materiList, selectedMateri, isLoadingMateri } from './lib/materiService'
 import {
   currentUser,
   isAuthenticated,
@@ -70,69 +73,50 @@ const playAudioNarrationSample = () => {
 }
 
 // Interactive State for Section 2: Pratinjau Materi Filter Tabs & Pro Teaser Modal
-const activeCategoryTab = ref('semua')
+const selectedJenjangTab = ref('Semua') // 'Semua' | 'SD' | 'SMP' | 'SMA'
 const showProTeaserModal = ref(false)
 const selectedTeaserModule = ref(null)
 
-const sampleModules = [
-  {
-    id: 1,
-    title: 'Petualangan Huruf Pertama Bersama Si Es Batu',
-    category: 'membaca',
-    categoryLabel: 'Membaca & Fonik',
-    ageLabel: '4–6 Tahun',
-    badges: ['Audio Narasi', 'Visual Animasi'],
-    summary: 'Mengenal bunyi dan bentuk huruf alfabet melalui tebak gambar interaktif.',
-    image: '/es_batu_card.jpg',
-    color: 'orange',
-    isPro: false,
-    isFree: true
-  },
-  {
-    id: 2,
-    title: 'Berhitung Bersama Sahabat Hutan',
-    category: 'logika',
-    categoryLabel: 'Angka & Logika',
-    ageLabel: '6–8 Tahun',
-    badges: ['Visual Interaktif', 'Sentuhan Ringan'],
-    summary: 'Memahami konsep penjumlahan dasar melalui animasi buah-buahan dan benda sekitar.',
-    image: '/Banner_Materi.jpg',
-    color: 'blue',
-    isPro: true,
-    isFree: false
-  },
-  {
-    id: 3,
-    title: 'Cerita Suara: Belajar Mengenal Rasa Senang & Sedih',
-    category: 'emosi',
-    categoryLabel: 'Regulasi Emosi & Inklusi',
-    ageLabel: 'Semua Usia',
-    badges: ['Audio Drama', 'Diskusi Ramah'],
-    summary: 'Cerita narasi pendek untuk membantu anak memahami emosi diri dan berempati pada teman sebaya.',
-    image: '/Banner_Dashboard.jpg',
-    color: 'pink',
-    isPro: true,
-    isFree: false
-  },
-  {
-    id: 4,
-    title: 'Eksplorasi Lingkungan & Wujud Benda Sekitar',
-    category: 'lingkungan',
-    categoryLabel: 'Eksplorasi Lingkungan',
-    ageLabel: '7–10 Tahun',
-    badges: ['Eksperimen', 'Worksheet'],
-    summary: 'Mengenal benda padat, cair, dan gas melalui simulasi interaktif di sekitar kita.',
-    image: '/es_batu_card.jpg',
-    color: 'green',
-    isPro: true,
-    isFree: false
+// Data materi bersumber langsung dari database (materiService.js)
+const displayedLandingModules = computed(() => {
+  return (materiList.value || []).map((item) => {
+    const badgeText = (item.badge || '').trim().toLowerCase()
+    const isFree = badgeText === 'gratis' || item.isFree === true || (!item.badge && !item.isPro)
+    const isPro = !isFree
+    
+    return {
+      id: item.id,
+      originalItem: item,
+      title: item.title,
+      jenjang: item.jenjang || 'SD',
+      category: (item.mataPelajaran || item.jenjang || 'umum').toLowerCase(),
+      mataPelajaran: item.mataPelajaran || 'Umum',
+      categoryLabel: item.mataPelajaran || item.jenjang || 'Materi Belajar',
+      ageLabel: item.level ? (item.level.split('•')[1]?.trim() || item.jenjang || 'Semua Jenjang') : (item.jenjang || 'Semua Jenjang'),
+      badges: Array.isArray(item.types) && item.types.length ? item.types : ['Video', 'Interaktif'],
+      summary: item.description || 'Materi pembelajaran adaptif dan interaktif Inkluvia.',
+      image: item.image || '/es_batu_card.jpg',
+      isPro,
+      isFree
+    }
+  })
+})
+
+// Filter berdasarkan jenjang ('Semua', 'SD', 'SMP', 'SMA') dan ambil 4 materi teratas
+const filteredLandingModules = computed(() => {
+  let list = displayedLandingModules.value
+  if (selectedJenjangTab.value !== 'Semua') {
+    list = list.filter((m) => (m.jenjang || '').trim().toUpperCase() === selectedJenjangTab.value.toUpperCase())
   }
-]
+  // Ambil 4 materi teratas
+  return list.slice(0, 4)
+})
 
 const handleModuleClick = (mod) => {
   playButtonPop()
-  if (mod.isFree) {
-    handleOpenDetail(materiList[0])
+  const userHasAccess = mod.isFree || currentUser.value?.isPro || isAdmin.value
+  if (userHasAccess) {
+    handleOpenDetail(mod.originalItem || mod)
   } else {
     selectedTeaserModule.value = mod
     showProTeaserModal.value = true
@@ -182,29 +166,16 @@ const chosenMode = ref('standard')
 // Auth Page state
 const authTab = ref('login')
 const authNoticeMessage = ref('')
-const showUserDropdown = ref(false)
-
-// Settings Modal state
-const showSettingsModal = ref(false)
+// Settings Page state
+const previousNav = ref('beranda')
 const settingsInitialTab = ref('profile')
 const openSettings = (tab = 'profile') => {
   settingsInitialTab.value = tab
-  showSettingsModal.value = true
-  showUserDropdown.value = false
+  navigateTo('settings')
 }
 
 // Pending navigation state (intended destination saved when intercepted by middleware)
 const intendedNav = ref(null)
-
-// Close dropdown on outside click
-const dropdownRef = ref(null)
-const handleOutsideClick = (e) => {
-  if (dropdownRef.value && !dropdownRef.value.contains(e.target)) {
-    showUserDropdown.value = false
-  }
-}
-onMounted(() => document.addEventListener('mousedown', handleOutsideClick))
-onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
 
 /**
  * Navigate to dedicated Auth Page
@@ -212,7 +183,6 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
 const navigateToAuth = (tab = 'login', notice = '') => {
   authTab.value = tab
   authNoticeMessage.value = notice
-  showUserDropdown.value = false
   currentNav.value = 'auth'
 }
 
@@ -254,19 +224,75 @@ const handleAuthenticated = (user) => {
 
 const handleLogout = async () => {
   await logoutUser()
-  showUserDropdown.value = false
   intendedNav.value = null
-  if (['admin', ...PROTECTED_ROUTES].includes(currentNav.value)) {
+  if (['admin', 'settings', ...PROTECTED_ROUTES].includes(currentNav.value)) {
     currentNav.value = 'beranda'
   }
 }
+
+// Smart Auto-Hiding Navbar State
+const isNavVisible = ref(true)
+const isScrolled = ref(false)
+const isMobileMenuOpen = ref(false)
+let lastScrollY = 0
+let scrollTicking = false
+
+const handleWindowScroll = () => {
+  if (!scrollTicking) {
+    window.requestAnimationFrame(() => {
+      const currentScrollY = window.scrollY
+      isScrolled.value = currentScrollY > 20
+
+      // If mobile dropdown menu is open, keep navbar visible
+      if (isMobileMenuOpen.value) {
+        isNavVisible.value = true
+        lastScrollY = Math.max(0, currentScrollY)
+        scrollTicking = false
+        return
+      }
+
+      // Always show when near the very top of the page
+      if (currentScrollY <= 30) {
+        isNavVisible.value = true
+      } else {
+        const diff = currentScrollY - lastScrollY
+        // Delta threshold to ignore tiny micro-movements
+        if (Math.abs(diff) > 6) {
+          if (diff > 0 && currentScrollY > 80) {
+            // Scrolling DOWN -> hide navbar smoothly
+            isNavVisible.value = false
+          } else if (diff < 0) {
+            // Scrolling UP -> reveal navbar immediately (never gets lost/tenggelam!)
+            isNavVisible.value = true
+          }
+        }
+      }
+
+      lastScrollY = Math.max(0, currentScrollY)
+      scrollTicking = false
+    })
+    scrollTicking = true
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleWindowScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleWindowScroll)
+})
 
 /**
  * Middleware-protected Navigation
  */
 const navigateTo = (tab) => {
-  showUserDropdown.value = false
-  
+  isMobileMenuOpen.value = false
+  isNavVisible.value = true
+  if (currentNav.value !== 'settings') {
+    previousNav.value = currentNav.value
+  }
+
   const guard = canAccessRoute(tab)
   if (!guard.allowed) {
     intendedNav.value = { tab }
@@ -275,6 +301,7 @@ const navigateTo = (tab) => {
   }
 
   currentNav.value = tab
+  window.scrollTo({ top: 0, behavior: 'smooth' })
   return true
 }
 
@@ -335,215 +362,304 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     <div class="absolute top-2/4 left-0 w-[400px] h-[400px] rounded-full bg-[#FF74BC]/06 blur-3xl pointer-events-none z-0"></div>
     <div class="absolute top-3/4 right-0 w-[400px] h-[400px] rounded-full bg-[#74DC2E]/05 blur-3xl pointer-events-none z-0"></div>
 
-    <!-- ==================== HEADER / NAVBAR ==================== -->
-    <header class="shrink-0 z-30 sticky top-0" style="background: rgba(255,255,255,0.86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 1px solid rgba(61,165,255,0.15); box-shadow: 0 2px 20px rgba(15,50,97,0.08);">
-      <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 h-[68px] flex items-center justify-between gap-4">
+    <!-- ==================== SMART AUTO-HIDING NAVBAR ==================== -->
+    <header
+      v-if="!['learning-player', 'auth'].includes(currentNav)"
+      :class="[
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out',
+        isNavVisible ? 'translate-y-0' : '-translate-y-full pointer-events-none',
+        isScrolled
+          ? 'bg-white/92 backdrop-blur-xl border-b border-blue-200/70 shadow-md shadow-[#0F3261]/08 py-2.5'
+          : 'bg-white/85 backdrop-blur-md border-b border-blue-100/60 shadow-xs py-3.5'
+      ]"
+    >
+      <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4">
 
         <!-- Left: Logo + Nav Links -->
         <div class="flex items-center gap-6 lg:gap-8">
           <!-- Logo -->
           <button
             @click="navigateTo('beranda')"
-            class="flex items-center gap-2.5 group cursor-pointer shrink-0"
+            class="flex items-center gap-2.5 sm:gap-3 group cursor-pointer shrink-0 text-left focus:outline-none"
           >
-            <div class="relative">
+            <div class="relative w-10 h-10 flex items-center justify-center p-1 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
               <img
                 src="/Logo.png"
                 alt="Logo Inkluvia"
-                class="h-10 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+                class="h-8 w-auto object-contain"
               />
             </div>
-            <span class="text-[22px] font-extrabold tracking-tight hidden sm:block" style="background: linear-gradient(135deg, #0F3261 0%, #3587CE 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-              Inkluvia
-            </span>
+            <div class="flex flex-col">
+              <span class="text-[22px] font-black tracking-tight leading-none" style="background: linear-gradient(135deg, #0F3261 0%, #3587CE 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Inkluvia
+              </span>
+              <span class="text-[10px] font-extrabold text-[#FF7315] tracking-wide uppercase mt-0.5 hidden sm:block">
+                Belajar Inklusif
+              </span>
+            </div>
           </button>
 
-          <!-- Nav Links -->
-          <nav class="hidden md:flex items-center gap-1">
+          <!-- Nav Links (Desktop Segmented Navigation) -->
+          <nav class="hidden md:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/70 backdrop-blur-xs">
             <button
               @click="navigateTo('beranda')"
               :class="[
-                'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer',
+                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
                 currentNav === 'beranda'
-                  ? 'bg-[#0F3261] text-white shadow-sm shadow-[#0F3261]/20'
-                  : 'text-slate-600 hover:text-[#0F3261] hover:bg-[#0F3261]/8'
+                  ? 'bg-[#0F3261] text-white shadow-sm shadow-[#0F3261]/25'
+                  : 'text-slate-600 hover:text-[#0F3261] hover:bg-white/80'
               ]"
             >
-              Beranda
+              <span>Beranda</span>
             </button>
+
             <button
               @click="navigateTo('materi')"
               :class="[
-                'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer',
-                ['materi', 'materi-detail', 'mode-select', 'learning-player'].includes(currentNav)
-                  ? 'bg-[#FF7315] text-white shadow-sm shadow-[#FF7315]/20'
-                  : 'text-slate-600 hover:text-[#FF7315] hover:bg-[#FF7315]/8'
+                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                ['materi', 'materi-detail', 'mode-select'].includes(currentNav)
+                  ? 'bg-[#FF7315] text-white shadow-sm shadow-[#FF7315]/25'
+                  : 'text-slate-600 hover:text-[#FF7315] hover:bg-white/80'
               ]"
             >
-              Materi
+              <span>Materi</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#FF7315]" v-if="!['materi', 'materi-detail', 'mode-select'].includes(currentNav)"></span>
             </button>
 
             <button
               @click="navigateTo('harga')"
               :class="[
-                'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer',
+                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
                 currentNav === 'harga'
-                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
-                  : 'text-slate-600 hover:text-amber-600 hover:bg-amber-50'
+                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/25'
+                  : 'text-slate-600 hover:text-amber-600 hover:bg-white/80'
               ]"
             >
-              Harga
+              <Sparkles class="w-3.5 h-3.5 text-amber-400" v-if="currentNav !== 'harga'" />
+              <span>Harga</span>
+            </button>
+
+            <button
+              v-if="isAdmin"
+              @click="navigateTo('admin')"
+              :class="[
+                'px-3.5 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                currentNav === 'admin'
+                  ? 'bg-[#54AA1B] text-white shadow-sm'
+                  : 'text-[#54AA1B] hover:bg-emerald-50'
+              ]"
+            >
+              <LayoutDashboard class="w-3.5 h-3.5" />
+              <span>CMS Admin</span>
             </button>
           </nav>
         </div>
 
-        <!-- Right: Search + Auth -->
-        <div class="flex items-center gap-3 flex-1 justify-end max-w-sm">
-          <!-- Search -->
-          <div class="relative flex-1 max-w-[220px] hidden sm:block">
+        <!-- Right: Audio FX Toggle + Search + Auth Desktop + Mobile Hamburger -->
+        <div class="flex items-center gap-2.5 sm:gap-3 flex-1 justify-end max-w-md">
+          
+          <!-- Sound Effects Toggle Button -->
+          <button
+            @click="toggleSound(); playButtonPop()"
+            :title="isSoundEnabled ? 'Efek Suara Aktif (klik untuk matikan)' : 'Efek Suara Nonaktif (klik untuk aktifkan)'"
+            class="w-9 h-9 rounded-full bg-slate-100/90 hover:bg-blue-50 text-slate-500 hover:text-[#3587CE] border border-slate-200/80 flex items-center justify-center transition cursor-pointer shrink-0"
+          >
+            <Volume2 v-if="isSoundEnabled" class="w-4 h-4 text-[#3587CE]" />
+            <VolumeX v-else class="w-4 h-4 text-slate-400" />
+          </button>
+
+          <!-- Search Input -->
+          <div class="relative flex-1 max-w-[210px] hidden sm:block">
             <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Cari materi..."
-              class="w-full bg-slate-100/80 hover:bg-white focus:bg-white text-sm pl-10 pr-4 py-2.5 rounded-full border border-slate-200 focus:border-[#3DA5FF] focus:outline-none focus:ring-2 focus:ring-[#3DA5FF]/20 transition placeholder:text-slate-400 text-slate-700"
+              class="w-full bg-slate-100/80 hover:bg-white focus:bg-white text-xs lg:text-sm pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:border-[#3DA5FF] focus:outline-none focus:ring-2 focus:ring-[#3DA5FF]/20 transition placeholder:text-slate-400 text-slate-700"
             />
           </div>
 
-          <!-- NOT LOGGED IN -->
-          <div v-if="!isAuthenticated" class="flex items-center gap-2 shrink-0">
+          <!-- NOT LOGGED IN DESKTOP -->
+          <div v-if="!isAuthenticated" class="hidden sm:flex items-center gap-2 shrink-0">
             <button
               @click="navigateToAuth('login')"
-              :class="[
-                'px-4 py-2 rounded-full border-2 border-[#3DA5FF] font-bold text-sm transition-all duration-200 active:scale-95 cursor-pointer',
-                currentNav === 'auth' && authTab === 'login'
-                  ? 'bg-[#3DA5FF]/10 text-[#3587CE]'
-                  : 'text-[#3587CE] hover:bg-[#3DA5FF]/10'
-              ]"
+              class="px-4 py-2 rounded-full border-2 border-blue-200 hover:border-[#3DA5FF] text-[#0F3261] hover:text-[#3587CE] hover:bg-blue-50/60 font-bold text-xs lg:text-sm transition-all duration-200 active:scale-95 cursor-pointer"
             >
               Masuk
             </button>
             <button
               @click="navigateToAuth('register')"
-              class="px-5 py-2 rounded-full text-white font-bold text-sm transition-all duration-200 active:scale-95 cursor-pointer"
-              style="background: linear-gradient(135deg,#FF7315,#e86105); box-shadow: 0 4px 14px rgba(255,115,21,0.35);"
+              class="px-5 py-2 rounded-full text-white font-black text-xs lg:text-sm transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:shadow-[#FF7315]/25"
+              style="background: linear-gradient(135deg, #FF7315 0%, #E86105 100%);"
             >
               Daftar Gratis
             </button>
           </div>
 
-          <!-- LOGGED IN — User Circular Profile Avatar & Dropdown -->
-          <div v-else class="relative shrink-0" ref="dropdownRef">
+          <!-- LOGGED IN DESKTOP (Profile Pill) -->
+          <div v-else class="hidden sm:flex items-center gap-2 shrink-0">
             <button
-              @click="showUserDropdown = !showUserDropdown"
-              class="relative w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-md border-2 border-white ring-2 cursor-pointer focus:outline-none"
-              :class="isAdmin ? 'ring-[#FF7315] bg-gradient-to-br from-[#FF7315] to-[#e86105]' : 'ring-[#3DA5FF] bg-gradient-to-br from-[#3DA5FF] to-[#0F3261]'"
-              :title="currentUser?.name ? `${currentUser.name} (${currentUser.role || 'User'})` : 'Profil Akun'"
+              @click="openSettings('profile')"
+              class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-100/90 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all duration-200 cursor-pointer group shadow-2xs"
             >
-              <span class="select-none leading-none">{{ currentUser?.avatar || '👧' }}</span>
-              <!-- Online / Role Status Indicator Dot -->
-              <span
-                class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
-                :class="isAdmin ? 'bg-[#FF7315]' : 'bg-emerald-500'"
-              ></span>
-            </button>
-
-            <!-- Dropdown Panel -->
-            <Transition name="dropdown">
-              <div
-                v-if="showUserDropdown"
-                class="absolute right-0 top-full mt-2 w-64 bg-white rounded-3xl border border-slate-100 shadow-2xl z-50 overflow-hidden animate-slide-up"
-              >
-                <!-- User Info Header -->
-                <div class="px-4 py-3.5 bg-gradient-to-r from-[#F4F8FD] to-white border-b border-slate-100">
-                  <div class="flex items-center gap-3">
-                    <div
-                      class="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm border border-white shrink-0"
-                      :class="isAdmin ? 'bg-gradient-to-br from-[#FF7315] to-[#e86105]' : 'bg-gradient-to-br from-[#3DA5FF] to-[#0F3261]'"
-                    >
-                      {{ currentUser?.avatar || '👧' }}
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-bold text-[#0F3261] truncate">{{ currentUser?.name }}</p>
-                      <p class="text-[11px] text-slate-400 truncate">{{ currentUser?.email }}</p>
-                      <span
-                        :class="[
-                          'inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold',
-                          currentUser?.role === 'admin'
-                            ? 'bg-orange-100 text-[#FF7315]'
-                            : 'bg-blue-100 text-[#3587CE]'
-                        ]"
-                      >
-                        {{ currentUser?.role === 'admin' ? '🛡️ Administrator' : '🎓 Siswa Pelajar' }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Menu Items -->
-                <div class="p-2 space-y-1">
-                  <!-- Admin Panel — hanya tampil jika admin -->
-                  <button
-                    v-if="isAdmin"
-                    @click="navigateTo('admin'); showUserDropdown = false"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition"
-                    style="background: linear-gradient(135deg,#FF7315,#e86105); box-shadow: 0 3px 10px rgba(255,115,21,0.30);"
-                  >
-                    <LayoutDashboard class="w-4 h-4 shrink-0" />
-                    <span>Dashboard Admin</span>
-                    <span class="ml-auto text-[10px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">CMS</span>
-                  </button>
-
-                  <button
-                    @click="navigateTo('materi'); showUserDropdown = false"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#3587CE] transition cursor-pointer"
-                  >
-                    <GraduationCap class="w-4 h-4 text-[#3587CE] shrink-0" />
-                    <span>Jelajahi Materi</span>
-                  </button>
-
-                  <!-- Pengaturan (Profile, Theme, Accessibility) -->
-                  <button
-                    @click="openSettings('profile')"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#0F3261] transition cursor-pointer"
-                  >
-                    <Settings class="w-4 h-4 text-slate-500 shrink-0" />
-                    <span>Pengaturan Profil</span>
-                  </button>
-
-                  <button
-                    @click="openSettings('theme')"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer"
-                  >
-                    <span class="text-sm shrink-0">🎨</span>
-                    <span>Tema Tampilan</span>
-                  </button>
-
-                  <button
-                    @click="openSettings('accessibility')"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer"
-                  >
-                    <span class="text-sm shrink-0">👓</span>
-                    <span>Aksesibilitas</span>
-                  </button>
-                </div>
-
-                <!-- Logout -->
-                <div class="p-2 border-t border-slate-100">
-                  <button
-                    @click="handleLogout"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                  >
-                    <LogOut class="w-4 h-4 shrink-0" />
-                    <span>Keluar</span>
-                  </button>
-                </div>
+              <div class="relative w-8 h-8 rounded-full flex items-center justify-center text-base bg-white border border-blue-200 shadow-2xs group-hover:scale-105 transition-transform">
+                <span class="select-none leading-none">{{ currentUser?.avatar || '👧' }}</span>
+                <span
+                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
+                  :class="isAdmin ? 'bg-[#FF7315]' : 'bg-emerald-500'"
+                ></span>
               </div>
-            </Transition>
+              <div class="flex flex-col text-left pr-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-black text-[#0F3261] leading-tight max-w-[90px] truncate">
+                    {{ currentUser?.name || 'Siswa' }}
+                  </span>
+                  <span
+                    v-if="currentUser?.isPro || isAdmin"
+                    class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs"
+                  >
+                    👑 PRO
+                  </span>
+                </div>
+                <span class="text-[10px] font-bold text-slate-400 leading-none">
+                  {{ isAdmin ? 'Admin' : (currentUser?.isPro ? 'Member PRO' : 'Akun Saya') }}
+                </span>
+              </div>
+            </button>
           </div>
+
+          <!-- Mobile Hamburger Toggle Button -->
+          <button
+            @click="isMobileMenuOpen = !isMobileMenuOpen"
+            class="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            aria-label="Toggle Menu"
+          >
+            <X v-if="isMobileMenuOpen" class="w-5 h-5 text-[#0F3261]" />
+            <Menu v-else class="w-5 h-5 text-[#0F3261]" />
+          </button>
         </div>
       </div>
+
+      <!-- Mobile Dropdown Menu -->
+      <transition name="dropdown">
+        <div
+          v-if="isMobileMenuOpen"
+          class="md:hidden bg-white/95 backdrop-blur-xl border-b border-blue-100 px-5 py-4 space-y-3 shadow-xl"
+        >
+          <!-- Mobile Search -->
+          <div class="relative">
+            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Cari materi belajar..."
+              class="w-full bg-slate-100 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#3DA5FF] focus:outline-none transition"
+            />
+          </div>
+
+          <!-- Mobile Nav Buttons -->
+          <div class="flex flex-col gap-1.5 pt-1">
+            <button
+              @click="navigateTo('beranda')"
+              :class="[
+                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                currentNav === 'beranda' ? 'bg-[#0F3261] text-white' : 'text-slate-700 hover:bg-slate-100'
+              ]"
+            >
+              <span>Beranda</span>
+              <ArrowRight class="w-4 h-4 opacity-70" />
+            </button>
+
+            <button
+              @click="navigateTo('materi')"
+              :class="[
+                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                ['materi', 'materi-detail', 'mode-select'].includes(currentNav) ? 'bg-[#FF7315] text-white' : 'text-slate-700 hover:bg-slate-100'
+              ]"
+            >
+              <span>Katalog Materi</span>
+              <ArrowRight class="w-4 h-4 opacity-70" />
+            </button>
+
+            <button
+              @click="navigateTo('harga')"
+              :class="[
+                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                currentNav === 'harga' ? 'bg-amber-500 text-white' : 'text-slate-700 hover:bg-slate-100'
+              ]"
+            >
+              <div class="flex items-center gap-2">
+                <span>Paket Langganan (Harga)</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">Promo</span>
+              </div>
+              <ArrowRight class="w-4 h-4 opacity-70" />
+            </button>
+
+            <button
+              v-if="isAdmin"
+              @click="navigateTo('admin')"
+              :class="[
+                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                currentNav === 'admin' ? 'bg-[#54AA1B] text-white' : 'text-[#54AA1B] hover:bg-emerald-50'
+              ]"
+            >
+              <span>CMS Admin Inkluvia</span>
+              <ArrowRight class="w-4 h-4 opacity-70" />
+            </button>
+          </div>
+
+          <!-- Mobile Auth Actions -->
+          <div class="pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <template v-if="!isAuthenticated">
+              <button
+                @click="navigateToAuth('login')"
+                class="w-full py-2.5 rounded-xl border border-blue-200 text-[#0F3261] font-bold text-sm text-center"
+              >
+                Masuk ke Akun
+              </button>
+              <button
+                @click="navigateToAuth('register')"
+                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF7315] to-[#E86105] text-white font-black text-sm text-center shadow-md"
+              >
+                Daftar Gratis Sekarang
+              </button>
+            </template>
+            <template v-else>
+              <button
+                @click="openSettings('profile')"
+                class="w-full py-2.5 px-4 rounded-xl bg-blue-50 text-[#0F3261] font-bold text-sm flex items-center justify-between"
+              >
+                <div class="flex items-center gap-2">
+                  <span>{{ currentUser?.avatar || '👧' }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-extrabold">{{ currentUser?.name || 'Profil Akun' }}</span>
+                    <span
+                      v-if="currentUser?.isPro || isAdmin"
+                      class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs"
+                    >
+                      👑 PRO
+                    </span>
+                  </div>
+                </div>
+                <Settings class="w-4 h-4 text-slate-400" />
+              </button>
+              <button
+                @click="handleLogout"
+                class="w-full py-2 text-rose-500 font-bold text-xs text-center hover:bg-rose-50 rounded-lg transition"
+              >
+                Keluar (Logout)
+              </button>
+            </template>
+          </div>
+        </div>
+      </transition>
     </header>
+
+    <!-- Spacer to reserve space for fixed navbar -->
+    <div
+      v-if="!['learning-player', 'auth'].includes(currentNav)"
+      class="h-[68px] sm:h-[72px] shrink-0 pointer-events-none"
+    ></div>
 
     <!-- ==================== VIEW: BERANDA ==================== -->
     <main v-if="currentNav === 'beranda'" class="flex-1 flex flex-col">
@@ -570,8 +686,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         </div>
 
         <!-- 2. Floating Star Sparkle (Left Middle) -->
-        <div class="absolute bottom-24 left-6 sm:left-12 z-10 pointer-events-none text-2xl text-[#FFDC58] animate-spin-slow hidden sm:block">
-          ⭐
+        <div class="absolute bottom-24 left-6 sm:left-12 z-10 pointer-events-none hidden sm:block">
+          <DoodleOrnament name="star-outline" color="#FFDC58" :size="36" class="animate-spin-slow" />
         </div>
 
         <!-- Giant Stroke Background Text -->
@@ -606,9 +722,9 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
               <!-- Headline with Accent Sparks & Playful Doodles -->
               <div class="space-y-1 relative">
-                <!-- Decorative Sparkle Badge next to Headline -->
-                <div class="absolute -top-6 -right-2 text-xl pointer-events-none animate-pulse-subtle hidden sm:block">
-                  ✨
+                <!-- Decorative Burst Badge next to Headline -->
+                <div class="absolute -top-6 -right-2 pointer-events-none hidden sm:block">
+                  <DoodleOrnament name="burst" color="#3DA5FF" :size="32" class="animate-pulse-subtle" />
                 </div>
 
                 <h1 class="font-black text-[#0F3261] tracking-tight leading-[1.10]">
@@ -657,9 +773,39 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- RIGHT: Artwork & Mascot Speech Pill directly over Si Es Batu -->
             <div class="lg:col-span-6 xl:col-span-7 relative flex flex-col items-center justify-center">
 
-              <!-- Main Artwork Image (`Banner_Dashboard2.jpg`) -->
+              <!-- Main Artwork Image (`Banner_Dashboard2.jpg`) with Authentic Hand-drawn Doodles -->
               <div class="w-full flex justify-center items-center relative">
                 
+                <!-- Doodle 1: Looping Arrow (Top Right) -->
+                <div class="absolute -top-7 right-6 z-20 pointer-events-none select-none hidden md:block rotate-12 animate-float-slow">
+                  <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="52" />
+                </div>
+
+                <!-- Doodle 2: Hand-drawn Outline Heart (Top Right Corner) -->
+                <div class="absolute top-1 -right-3 z-20 pointer-events-none select-none hidden lg:block rotate-12">
+                  <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+                </div>
+
+                <!-- Doodle 3: Floating Pastel Dots Cluster (Middle Right) -->
+                <div class="absolute top-1/3 -right-6 z-20 pointer-events-none select-none hidden lg:block animate-float-medium">
+                  <DoodleOrnament name="dots-cluster" :size="54" />
+                </div>
+
+                <!-- Doodle 4: Hand-drawn Outline Star (Bottom Right) -->
+                <div class="absolute -bottom-5 right-12 z-20 pointer-events-none select-none hidden sm:block -rotate-6 animate-bounce-subtle">
+                  <DoodleOrnament name="star-outline" color="#FFDC58" :size="42" />
+                </div>
+
+                <!-- Doodle 5: Squiggly Wavy Line (Bottom Left) -->
+                <div class="absolute -bottom-4 left-6 z-20 pointer-events-none select-none hidden md:block rotate-3">
+                  <DoodleOrnament name="squiggle" color="#FF7315" :size="68" />
+                </div>
+
+                <!-- Doodle 6: Three-Ray Burst (Middle Left) -->
+                <div class="absolute top-1/4 -left-6 z-20 pointer-events-none select-none hidden lg:block -rotate-12 animate-pulse-subtle">
+                  <DoodleOrnament name="burst" color="#3DA5FF" :size="34" />
+                </div>
+
                 <!-- Cute & Friendly Mascot Speech Pill Badge (Positioned directly over Si Es Batu's head) -->
                 <div class="pointer-events-auto absolute top-[14%] sm:top-[16%] left-[58%] sm:left-[59%] -translate-x-1/2 z-30">
                   <div class="relative flex flex-col items-center">
@@ -709,9 +855,20 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <!-- Background Blobs & Section Doodles (On Scrolling) -->
         <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#FFDC58]/15 blur-3xl pointer-events-none"></div>
         <div class="absolute bottom-0 -left-20 w-80 h-80 rounded-full bg-[#3DA5FF]/12 blur-3xl pointer-events-none"></div>
-        <div class="absolute top-10 left-8 text-2xl text-[#FFDC58] animate-bounce-subtle pointer-events-none hidden sm:block">⭐</div>
-        <div class="absolute bottom-12 right-12 text-xl text-[#FF74BC] pointer-events-none hidden sm:block">✨</div>
-        <div class="absolute top-1/2 left-4 w-6 h-6 rounded-full border-4 border-[#3DA5FF]/30 pointer-events-none hidden sm:block"></div>
+        
+        <!-- Authentic Hand-drawn Doodles for Section 1 -->
+        <div class="absolute top-10 left-8 pointer-events-none select-none hidden sm:block -rotate-6 animate-bounce-subtle">
+          <DoodleOrnament name="star-outline" color="#FFDC58" :size="38" />
+        </div>
+        <div class="absolute top-14 right-12 pointer-events-none select-none hidden sm:block animate-pulse-subtle">
+          <DoodleOrnament name="burst" color="#3DA5FF" :size="32" />
+        </div>
+        <div class="absolute top-1/2 left-4 pointer-events-none select-none hidden xl:block animate-float-medium">
+          <DoodleOrnament name="dots-duo" :size="44" />
+        </div>
+        <div class="absolute bottom-8 right-16 pointer-events-none select-none hidden lg:block rotate-6">
+          <DoodleOrnament name="squiggle" color="#74DC2E" :size="65" />
+        </div>
 
         <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
           
@@ -820,12 +977,28 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </section>
 
       <!-- ==================== SECTION 2: PRATINJAU MATERI & AKTIVITAS ==================== -->
-      <section class="w-full bg-[#FFFDF9] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-orange-100/60 relative overflow-hidden">
+      <section
+        class="w-full bg-[#FFFDF9] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-orange-100/60 relative overflow-hidden"
+        style="background-image: radial-gradient(#fce0c7 1.2px, transparent 1.2px); background-size: 30px 30px;"
+      >
         <!-- Section Background Blobs & Doodles (On Scrolling) -->
         <div class="absolute top-10 right-10 w-96 h-96 rounded-full bg-[#FF7315]/08 blur-3xl pointer-events-none"></div>
         <div class="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#FFDC58]/10 blur-3xl pointer-events-none"></div>
-        <div class="absolute top-16 right-8 text-xl text-[#FF7315] opacity-75 pointer-events-none hidden sm:block">🔸</div>
-        <div class="absolute bottom-16 left-8 text-2xl opacity-40 pointer-events-none hidden sm:block">📖</div>
+        
+        <!-- Authentic Hand-drawn Doodles for Section 2 -->
+        <div class="absolute top-16 right-8 pointer-events-none select-none hidden sm:block animate-pulse-subtle">
+          <DoodleOrnament name="spiral" color="#FF7315" :size="36" />
+        </div>
+        <div class="absolute top-1/3 left-6 pointer-events-none select-none hidden md:block -rotate-12">
+          <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+        </div>
+        <div class="absolute bottom-16 right-10 pointer-events-none select-none hidden xl:block animate-float-slow">
+          <DoodleOrnament name="dots-cluster" :size="48" />
+        </div>
+        <div class="absolute bottom-12 left-8 pointer-events-none select-none hidden sm:block rotate-3">
+          <DoodleOrnament name="squiggle" color="#FFDC58" :size="65" />
+        </div>
+
         <div class="w-full max-w-[1440px] mx-auto space-y-10">
           
           <!-- Section Header -->
@@ -841,69 +1014,61 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </p>
           </div>
 
-          <!-- Category Filter Tabs -->
-          <div class="flex items-center justify-center flex-wrap gap-2 sm:gap-3">
+          <!-- Jenjang Filter Tabs (Semua, SD, SMP, SMA) -->
+          <div class="flex items-center justify-center flex-wrap gap-2.5 sm:gap-3.5">
             <button
-              @click="activeCategoryTab = 'semua'"
+              v-for="jenjang in ['Semua', 'SD', 'SMP', 'SMA']"
+              :key="jenjang"
+              @click="selectedJenjangTab = jenjang; playButtonPop()"
               :class="[
-                'px-4 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition cursor-pointer',
-                activeCategoryTab === 'semua'
-                  ? 'bg-[#0F3261] text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                'px-5 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer shadow-xs',
+                selectedJenjangTab === jenjang
+                  ? 'bg-[#0F3261] text-white shadow-md scale-105 ring-2 ring-[#0F3261]/20'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
               ]"
             >
-              Semua Materi
-            </button>
-            <button
-              @click="activeCategoryTab = 'membaca'"
-              :class="[
-                'px-4 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition cursor-pointer',
-                activeCategoryTab === 'membaca'
-                  ? 'bg-[#FF7315] text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              ]"
-            >
-              Membaca & Fonik (4–6 Thn)
-            </button>
-            <button
-              @click="activeCategoryTab = 'logika'"
-              :class="[
-                'px-4 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition cursor-pointer',
-                activeCategoryTab === 'logika'
-                  ? 'bg-[#3DA5FF] text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              ]"
-            >
-              Logika & Angka (6–8 Thn)
-            </button>
-            <button
-              @click="activeCategoryTab = 'emosi'"
-              :class="[
-                'px-4 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition cursor-pointer',
-                activeCategoryTab === 'emosi'
-                  ? 'bg-[#E1529C] text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              ]"
-            >
-              Cerita Sosial & Emosi
-            </button>
-            <button
-              @click="activeCategoryTab = 'lingkungan'"
-              :class="[
-                'px-4 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition cursor-pointer',
-                activeCategoryTab === 'lingkungan'
-                  ? 'bg-[#54AA1B] text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              ]"
-            >
-              Eksplorasi Lingkungan (7–10 Thn)
+              {{ jenjang === 'Semua' ? 'Semua Jenjang' : 'Jenjang ' + jenjang }}
             </button>
           </div>
 
           <!-- Module Cards Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+            
+            <!-- 1. LOADING STATE: Saat materi sedang dimuat dari Supabase -->
+            <div v-if="isLoadingMateri" class="col-span-full py-16 text-center space-y-3">
+              <div class="w-12 h-12 rounded-full border-4 border-blue-200 border-t-[#3DA5FF] animate-spin mx-auto"></div>
+              <p class="text-xs font-bold text-slate-400">Memuat materi dari database...</p>
+            </div>
+
+            <!-- 2. EMPTY STATE: Jika jenjang kosong atau belum ada materi di database (klo kosong ya kosong) -->
             <div
-              v-for="mod in sampleModules.filter(m => activeCategoryTab === 'semua' || m.category === activeCategoryTab)"
+              v-else-if="filteredLandingModules.length === 0"
+              class="col-span-full py-14 px-6 bg-white/85 rounded-3xl border-2 border-dashed border-blue-200 text-center space-y-4 max-w-md mx-auto shadow-xs"
+            >
+              <div class="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto text-3xl shadow-inner">
+                🧊
+              </div>
+              <div class="space-y-1.5">
+                <h3 class="text-lg font-black text-[#0F3261]">
+                  Belum Ada Materi di Jenjang {{ selectedJenjangTab }}
+                </h3>
+                <p class="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
+                  Materi pembelajaran untuk jenjang {{ selectedJenjangTab }} belum tersedia atau sedang disiapkan oleh tim pengajar Inkluvia.
+                </p>
+              </div>
+              <button
+                @click="selectedJenjangTab = 'Semua'; playButtonPop()"
+                class="px-5 py-2.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#3587CE] text-xs font-black transition cursor-pointer border border-blue-200 inline-flex items-center gap-1.5"
+              >
+                <span>Lihat Semua Jenjang</span>
+                <ArrowRight class="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <!-- 3. REAL DATABASE CARDS: Yang gratis ya gratis, yang berbayar ya PRO -->
+            <div
+              v-else
+              v-for="mod in filteredLandingModules"
               :key="mod.id"
               class="bg-white rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative"
             >
@@ -911,13 +1076,19 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               <div class="relative h-44 w-full overflow-hidden bg-slate-100">
                 <img :src="mod.image" :alt="mod.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 
-                <!-- Free vs Pro Lock Badge Overlay -->
-                <div class="absolute top-3 left-3 z-10">
-                  <span v-if="mod.isFree" class="px-3 py-1 rounded-full text-[11px] font-black bg-emerald-500 text-white shadow-md flex items-center gap-1">
+                <!-- Free vs Pro Lock Badge Overlay & Jenjang Badge -->
+                <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+                  <span v-if="mod.isFree" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-500 text-white shadow-md flex items-center gap-1">
                     ⭐ GRATIS
                   </span>
-                  <span v-else class="px-3 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md flex items-center gap-1">
+                  <span v-else-if="currentUser?.isPro || isAdmin" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 shadow-md flex items-center gap-1">
+                    👑 PRO AKTIF
+                  </span>
+                  <span v-else class="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md flex items-center gap-1">
                     <Lock class="w-3 h-3" /> PRO
+                  </span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#0F3261]/80 text-white backdrop-blur-xs">
+                    {{ mod.jenjang }}
                   </span>
                 </div>
 
@@ -925,8 +1096,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   {{ mod.ageLabel }}
                 </div>
 
-                <!-- Pro Lock Glassmorphism Blur Overlay -->
-                <div v-if="mod.isPro" class="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                <!-- Pro Lock Glassmorphism Blur Overlay (Hanya jika belum PRO) -->
+                <div v-if="mod.isPro && !currentUser?.isPro && !isAdmin" class="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
                   <div class="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full text-[11px] font-extrabold text-amber-600 border border-amber-200 shadow-md flex items-center gap-1.5">
                     <Lock class="w-3.5 h-3.5 text-amber-600" />
                     <span>Konten Premium</span>
@@ -962,11 +1133,15 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                     @click="handleModuleClick(mod)"
                     :class="[
                       'px-4 py-2 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer rounded-full transition active:scale-95 shadow-sm',
-                      mod.isFree ? 'btn-tactile-orange' : 'bg-gradient-to-r from-amber-500 to-[#FF7315] text-white hover:brightness-110'
+                      (mod.isFree || currentUser?.isPro || isAdmin)
+                        ? 'btn-tactile-orange'
+                        : 'bg-gradient-to-r from-amber-500 to-[#FF7315] text-white hover:brightness-110'
                     ]"
                   >
-                    <span>{{ mod.isFree ? 'Coba Demo Gratis' : 'Buka Akses PRO' }}</span>
-                    <ArrowRight v-if="mod.isFree" class="w-3.5 h-3.5" />
+                    <span v-if="mod.isFree">Coba Demo Gratis</span>
+                    <span v-else-if="currentUser?.isPro || isAdmin">Mulai Belajar PRO ⭐</span>
+                    <span v-else>Buka Akses PRO</span>
+                    <ArrowRight v-if="mod.isFree || currentUser?.isPro || isAdmin" class="w-3.5 h-3.5" />
                     <Lock v-else class="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1024,12 +1199,13 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- Modal Action Buttons -->
             <div class="space-y-3 pt-2">
               <button
-                @click="showProTeaserModal = false; navigateToAuth('register', 'Daftar akun gratis sekarang untuk membuka modul premium Inkluvia!')"
+                @click="showProTeaserModal = false; navigateTo('harga')"
                 class="btn-tactile-orange w-full py-3.5 font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg"
               >
-                <span>Daftar Akun Gratis Sekarang ➔</span>
+                <span>👑 Beli Paket Inkluvia Premium via Xendit ➔</span>
               </button>
               <button
+                v-if="!isAuthenticated"
                 @click="showProTeaserModal = false; navigateToAuth('login')"
                 class="w-full py-2.5 text-xs font-bold text-slate-500 hover:text-[#0F3261] transition cursor-pointer"
               >
@@ -1040,185 +1216,285 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         </div>
       </Transition>
 
-      <!-- ==================== SECTION 3: MENGENAL MASKOT "SI ES BATU" ==================== -->
-      <section class="w-full bg-[#F0F7FF] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 relative overflow-hidden border-b border-blue-100/60">
-        <div class="w-full max-w-[1440px] mx-auto">
-          
-          <div class="bg-gradient-to-br from-white via-blue-50/50 to-white rounded-3xl border-2 border-blue-200/80 p-8 sm:p-12 lg:p-14 shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative">
-            
-            <!-- LEFT: 3D Mascot Banner Card with Sound Trigger -->
-            <div class="lg:col-span-5 flex flex-col items-center justify-center relative space-y-4">
-              <div class="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl bg-gradient-to-br from-[#3DA5FF]/20 to-[#FF7315]/20 flex items-center justify-center group">
-                <img src="/es_batu_card.jpg" alt="Si Es Batu Mascot" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div class="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-md text-center border border-blue-100 flex items-center justify-between">
-                  <span class="text-xs font-black text-[#0F3261]">🧊 Si Es Batu</span>
-                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-orange-100 text-[#FF7315]">Pendamping Virtual</span>
-                </div>
-              </div>
+      <!-- ==================== SECTION 3: 4 MODE BELAJAR ADAPTIF ==================== -->
+      <section
+        class="w-full bg-[#F4F9FF] px-4 sm:px-6 lg:px-8 py-20 sm:py-24 border-b border-blue-100/60 relative overflow-hidden"
+        style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
+      >
+        <!-- Soft Background Ambient Blobs (Konsisten dengan bagian lainnya) -->
+        <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#FFDC58]/15 blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-0 -left-20 w-80 h-80 rounded-full bg-[#3DA5FF]/12 blur-3xl pointer-events-none"></div>
 
-              <!-- Interactive Voice Button -->
-              <button
-                @click="triggerMascot"
-                class="w-full max-w-[320px] py-2.5 px-4 rounded-full bg-white hover:bg-blue-50 text-[#0F3261] border-2 border-[#3DA5FF] font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
-              >
-                <Volume2 class="w-4 h-4 text-[#3587CE]" />
-                <span>🔊 Sapa Sahabat Belajar!</span>
-              </button>
-            </div>
-
-            <!-- RIGHT: Mascot Features & Positive Gamification -->
-            <div class="lg:col-span-7 space-y-6 text-left">
-              <div class="space-y-2">
-                <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 text-[#3587CE] text-xs font-extrabold tracking-wide uppercase">
-                  SAHABAT BELAJAR
-                </span>
-                <h2 class="text-2xl sm:text-4xl font-extrabold text-[#0F3261] tracking-tight">
-                  Si Es Batu: Sahabat yang Selalu Mendukungmu
-                </h2>
-                <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
-                  Fitur <b>Gamifikasi Edukatif</b> berbasis pendamping virtual ramah anak. Tanpa persaingan skor atau tekanan waktu, Si Es Batu hadir memvalidasi setiap langkah kecil anak.
-                </p>
-              </div>
-
-              <div class="space-y-4 pt-2">
-                <!-- 1. Umpan Balik Positif -->
-                <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-blue-100 shadow-sm hover:shadow-md transition">
-                  <div class="w-11 h-11 rounded-2xl bg-orange-100 text-[#FF7315] flex items-center justify-center shrink-0 font-bold shadow-xs">
-                    <Smile class="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 class="text-sm font-extrabold text-[#0F3261]">Umpan Balik Positif (*Positive Reinforcement*)</h4>
-                    <p class="text-xs text-slate-500 font-medium leading-relaxed mt-0.5">
-                      Maskot memberikan animasi ekspresi ceria dan pesan penyemangat setiap kali latihan diselesaikan.
-                    </p>
-                  </div>
-                </div>
-
-                <!-- 2. Koleksi Lencana -->
-                <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-blue-100 shadow-sm hover:shadow-md transition">
-                  <div class="w-11 h-11 rounded-2xl bg-blue-100 text-[#3587CE] flex items-center justify-center shrink-0 font-bold shadow-xs">
-                    <Award class="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 class="text-sm font-extrabold text-[#0F3261]">Koleksi Lencana Digital (*Badges*)</h4>
-                    <p class="text-xs text-slate-500 font-medium leading-relaxed mt-0.5">
-                      Anak mendapatkan stiker digital tanpa sistem peringkat yang membandingkan performa dengan anak lain.
-                    </p>
-                  </div>
-                </div>
-
-                <!-- 3. Pengingat Istirahat -->
-                <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-blue-100 shadow-sm hover:shadow-md transition">
-                  <div class="w-11 h-11 rounded-2xl bg-pink-100 text-[#E1529C] flex items-center justify-center shrink-0 font-bold shadow-xs">
-                    <Brain class="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 class="text-sm font-extrabold text-[#0F3261]">Pengingat Istirahat (*Mindful Breaks*)</h4>
-                    <p class="text-xs text-slate-500 font-medium leading-relaxed mt-0.5">
-                      Jika anak belajar lebih dari batas waktu yang dianjurkan, maskot mengajak anak meregangkan badan dan beristirahat.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
+        <!-- Authentic Hand-drawn Doodles for Section 3 (Pas & Gak Maksain) -->
+        <!-- 1. Bintang Garis Kuning di Kiri Atas -->
+        <div class="absolute top-10 left-8 sm:left-14 pointer-events-none select-none hidden sm:block -rotate-12 animate-bounce-subtle">
+          <DoodleOrnament name="star-outline" color="#FFDC58" :size="42" />
         </div>
-      </section>
 
-      <!-- ==================== SECTION 4: RUANG KHUSUS GURU & ORANG TUA ==================== -->
-      <section class="w-full bg-white px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-slate-100">
-        <div class="w-full max-w-[1440px] mx-auto space-y-12">
+        <!-- 2. Looping Arrow di Kanan Atas -->
+        <div class="absolute top-12 right-10 sm:right-16 pointer-events-none select-none hidden sm:block rotate-12 animate-float-slow">
+          <DoodleOrnament name="arrow-loop" color="#3DA5FF" :size="48" />
+        </div>
+
+        <!-- 3. Pastel Dots Cluster di Kiri Tengah -->
+        <div class="absolute top-1/2 left-6 pointer-events-none select-none hidden xl:block animate-float-medium">
+          <DoodleOrnament name="dots-cluster" :size="48" />
+        </div>
+
+        <!-- 4. Hati Doodle di Kanan Tengah -->
+        <div class="absolute top-1/2 right-6 pointer-events-none select-none hidden xl:block rotate-12">
+          <DoodleOrnament name="heart-outline" color="#FF74BC" :size="36" />
+        </div>
+
+        <!-- 5. Squiggle Wavy di Kiri Bawah -->
+        <div class="absolute bottom-12 left-8 sm:left-12 pointer-events-none select-none hidden lg:block -rotate-3">
+          <DoodleOrnament name="squiggle" color="#FF7315" :size="70" />
+        </div>
+
+        <!-- 6. Radiant Burst di Kanan Bawah -->
+        <div class="absolute bottom-16 right-8 sm:right-14 pointer-events-none select-none hidden lg:block rotate-12 animate-pulse-subtle">
+          <DoodleOrnament name="burst" color="#54AA1B" :size="32" />
+        </div>
+
+        <div class="w-full max-w-5xl mx-auto space-y-12 relative z-10">
           
-          <!-- Section Header -->
-          <div class="text-center max-w-3xl mx-auto space-y-3">
-            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100 text-[#54AA1B] text-xs font-extrabold tracking-wide uppercase">
-              DUKUNGAN PENDAMPING
+          <!-- Section Header (Clean, Calm, Spacious) -->
+          <div class="text-center max-w-2xl mx-auto space-y-3">
+            <span class="inline-flex items-center px-3.5 py-1 rounded-full bg-blue-50 text-[#3587CE] text-xs font-bold uppercase tracking-wider border border-blue-200/60">
+              Pilihan Cara Belajar
             </span>
-            <h2 class="text-2xl sm:text-4xl font-extrabold text-[#0F3261] tracking-tight">
-              Kolaborasi Nyaman antara Sekolah dan Rumah
+            <h2 class="text-3xl sm:text-4xl font-black text-[#0F3261] tracking-tight">
+              4 Mode Belajar Adaptif di Inkluvia
             </h2>
-            <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
-              Dukungan alat bantu lengkap agar pendampingan belajar menjadi lebih terarah dan menyenangkan.
+            <p class="text-sm sm:text-base text-slate-500 font-normal leading-relaxed">
+              Setiap anak memiliki cara belajar yang unik. Pilih format yang paling nyaman dan mendukung pemahaman optimal.
             </p>
           </div>
 
-          <!-- Dual-Cards Split Layout -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- 2x2 Spacious Mode Cards Grid with Rich Hover Effects & Differentiated Personalities -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
             
-            <!-- Card A: Lembar Kerja & Aktivitas -->
-            <div class="bg-gradient-to-br from-[#F4F9FF] to-white rounded-3xl p-8 sm:p-10 border-2 border-blue-100 shadow-md flex flex-col justify-between space-y-8 relative group">
-              <div class="space-y-5">
-                <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-[#3587CE]">
-                  LEMBAR KERJA & AKTIVITAS
-                </span>
-                <h3 class="text-xl sm:text-2xl font-extrabold text-[#0F3261]">
-                  Materi Interaktif & Lembar Kerja Cetak
-                </h3>
-
-                <ul class="space-y-3.5 text-xs sm:text-sm text-slate-600 font-medium">
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                    <span>Lembar kerja yang siap dicetak (*Printable Activity Sheets*).</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                    <span>Panduan penerapan materi pembelajaran yang fleksibel.</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#3DA5FF] shrink-0 mt-0.5" />
-                    <span>Opsi penyesuaian materi untuk kebutuhan belajar individual.</span>
-                  </li>
-                </ul>
-              </div>
+            <!-- 1. Mode Standar (Inkluvia Blue Theme) -->
+            <div
+              @click="chosenMode = 'standard'; handleStartAdventure(); playButtonPop()"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#3DA5FF] shadow-xs hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+            >
+              <!-- Subtle Top Accent Hover Glow -->
+              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#3DA5FF] to-[#3587CE] opacity-80 group-hover:opacity-100 transition-opacity"></div>
 
               <div>
-                <button
-                  @click="navigateTo('materi')"
-                  class="btn-tactile-orange w-full py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                >
-                  <span>Jelajahi Katalog Materi</span>
-                  <ArrowRight class="w-4 h-4" />
-                </button>
+                <!-- Header: Icon + Title + Theme Badge -->
+                <div class="flex items-center justify-between gap-4 mb-4">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-13 h-13 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center p-2 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <img src="/Icon_Standar Mode.png" alt="Mode Standar" class="max-h-full max-w-full object-contain" />
+                    </div>
+                    <div>
+                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#3587CE] transition-colors">
+                        1. Standar
+                      </h3>
+                      <p class="text-xs text-slate-400 font-medium">Format Video Utama</p>
+                    </div>
+                  </div>
+                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-blue-50 text-[#3587CE] border border-blue-200/80 shrink-0">
+                    Reguler
+                  </span>
+                </div>
+
+                <!-- Punchy & Concise Description (Teks Ringkas) -->
+                <p class="text-sm text-slate-600 font-medium leading-relaxed">
+                  Video interaktif menyeluruh dengan perpaduan visual dinamis, animasi menarik, dan narasi audio lengkap untuk mendukung belajar mandiri.
+                </p>
+
+                <!-- Key Feature Tags -->
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors">
+                    🎬 Animasi Interaktif
+                  </span>
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors">
+                    🔊 Narasi Audio Penuh
+                  </span>
+                </div>
+              </div>
+
+              <!-- Footer: Target Pengguna + Hover Action CTA -->
+              <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
+                  <span class="ml-1.5 text-slate-600 font-medium">Siswa kebutuhan umum / reguler</span>
+                </div>
+                <span class="font-black text-[#3587CE] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                  <span>Coba</span>
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </span>
               </div>
             </div>
 
-            <!-- Card B: Untuk Orang Tua & Pendamping -->
-            <div class="bg-gradient-to-br from-[#FFF8F3] to-white rounded-3xl p-8 sm:p-10 border-2 border-orange-100 shadow-md flex flex-col justify-between space-y-8 relative group">
-              <div class="space-y-5">
-                <span class="inline-block px-3 py-1 rounded-full text-xs font-black bg-orange-100 text-[#FF7315]">
-                  UNTUK ORANG TUA & PENDAMPING
-                </span>
-                <h3 class="text-xl sm:text-2xl font-extrabold text-[#0F3261]">
-                  Dampingi Tumbuh Kembang Tanpa Bingung
-                </h3>
-
-                <ul class="space-y-3.5 text-xs sm:text-sm text-slate-600 font-medium">
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                    <span>Ringkasan aktivitas belajar mingguan yang mudah dipahami.</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                    <span>Ide aktivitas motorik dan percakapan pendukung di luar gawai.</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <CheckCircle2 class="w-5 h-5 text-[#FF7315] shrink-0 mt-0.5" />
-                    <span>Panduan mendampingi anak saat mengalami kelelahan belajar (*sensory overload*).</span>
-                  </li>
-                </ul>
-              </div>
+            <!-- 2. Mode Slow (Warm Amber Theme) -->
+            <div
+              @click="chosenMode = 'slow'; handleStartAdventure(); playButtonPop()"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-amber-400 shadow-xs hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+            >
+              <!-- Subtle Top Accent Hover Glow -->
+              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#FFDC58] to-[#FF7315] opacity-80 group-hover:opacity-100 transition-opacity"></div>
 
               <div>
-                <button
-                  @click="navigateTo('materi')"
-                  class="btn-tactile-white w-full py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-2xs border-2 border-[#0F3261] text-[#0F3261]"
-                >
-                  <span>Mulai Belajar</span>
-                  <ArrowRight class="w-4 h-4" />
-                </button>
+                <!-- Header: Icon + Title + Theme Badge -->
+                <div class="flex items-center justify-between gap-4 mb-4">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-13 h-13 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      🐢
+                    </div>
+                    <div>
+                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#FF7315] transition-colors">
+                        2. Slow
+                      </h3>
+                      <p class="text-xs text-slate-400 font-medium">Tempo Terukur & Artikulasi Bertahap</p>
+                    </div>
+                  </div>
+                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0">
+                    Tempo Terukur
+                  </span>
+                </div>
+
+                <!-- Punchy & Concise Description (Teks Ringkas) -->
+                <p class="text-sm text-slate-600 font-medium leading-relaxed">
+                  Penyampaian materi lebih santai dengan jeda proporsional antarpenjelasan, memberikan waktu retensi ekstra untuk mencerna poin pembahasan.
+                </p>
+
+                <!-- Key Feature Tags -->
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-amber-50 group-hover:text-amber-800 transition-colors">
+                    ⏱️ Artikulasi Bertahap
+                  </span>
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-amber-50 group-hover:text-amber-800 transition-colors">
+                    ⏸️ Jeda Retensi Nyaman
+                  </span>
+                </div>
+              </div>
+
+              <!-- Footer: Target Pengguna + Hover Action CTA -->
+              <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
+                  <span class="ml-1.5 text-slate-600 font-medium">Disabilitas intelektual & atensi</span>
+                </div>
+                <span class="font-black text-[#FF7315] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                  <span>Coba</span>
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+
+            <!-- 3. Mode Kontras Tinggi (High Contrast Slate/Yellow Theme) -->
+            <div
+              @click="chosenMode = 'high_contrast'; handleStartAdventure(); playButtonPop()"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-slate-800 shadow-xs hover:shadow-xl hover:shadow-slate-900/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+            >
+              <!-- Subtle Top Accent Hover Glow -->
+              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-slate-900 via-yellow-400 to-[#FFDC58] opacity-80 group-hover:opacity-100 transition-opacity"></div>
+
+              <div>
+                <!-- Header: Icon + Title + Theme Badge -->
+                <div class="flex items-center justify-between gap-4 mb-4">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-13 h-13 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl text-yellow-400 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      👁️
+                    </div>
+                    <div>
+                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-slate-900 transition-colors">
+                        3. Kontras Tinggi
+                      </h3>
+                      <p class="text-xs text-slate-400 font-medium">Keterbacaan Visual Maksimal</p>
+                    </div>
+                  </div>
+                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-slate-900 text-yellow-400 border border-slate-700 shrink-0">
+                    High Contrast
+                  </span>
+                </div>
+
+                <!-- Punchy & Concise Description (Teks Ringkas) -->
+                <p class="text-sm text-slate-600 font-medium leading-relaxed">
+                  Rasio kontras warna tajam, batas objek tegas, dan tipografi diperbesar dengan durasi efisien 4–5 menit untuk kenyamanan visual bebas lelah.
+                </p>
+
+                <!-- Key Feature Tags -->
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors">
+                    🔲 Kontras Warna Tegas
+                  </span>
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors">
+                    🔍 Durasi Ringkas 4–5 Mnt
+                  </span>
+                </div>
+              </div>
+
+              <!-- Footer: Target Pengguna + Hover Action CTA -->
+              <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
+                  <span class="ml-1.5 text-slate-600 font-medium">Hambatan penglihatan (Low Vision)</span>
+                </div>
+                <span class="font-black text-slate-900 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                  <span>Coba</span>
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+
+            <!-- 4. Mode Focus (Zen Emerald Green Theme) -->
+            <div
+              @click="chosenMode = 'focus'; handleStartAdventure(); playButtonPop()"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-emerald-500 shadow-xs hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+            >
+              <!-- Subtle Top Accent Hover Glow -->
+              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#74DC2E] to-[#54AA1B] opacity-80 group-hover:opacity-100 transition-opacity"></div>
+
+              <div>
+                <!-- Header: Icon + Title + Theme Badge -->
+                <div class="flex items-center justify-between gap-4 mb-4">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-13 h-13 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center p-2 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <img src="/Icon_Focus Mode.png" alt="Mode Focus" class="max-h-full max-w-full object-contain" />
+                    </div>
+                    <div>
+                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#54AA1B] transition-colors">
+                        4. Focus
+                      </h3>
+                      <p class="text-xs text-slate-400 font-medium">Bebas Distraksi & Stimulasi Tenang</p>
+                    </div>
+                  </div>
+                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 shrink-0">
+                    Bebas Distraksi
+                  </span>
+                </div>
+
+                <!-- Punchy & Concise Description (Teks Ringkas) -->
+                <p class="text-sm text-slate-600 font-medium leading-relaxed">
+                  Tampilan bersih bebas ornamen dan transisi mencolok. Materi difokuskan pada konten inti guna menciptakan suasana belajar hening dan fokus.
+                </p>
+
+                <!-- Key Feature Tags -->
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors">
+                    🧘 Stimulasi Minimalis
+                  </span>
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors">
+                    🎯 Inti Materi Langsung
+                  </span>
+                </div>
+              </div>
+
+              <!-- Footer: Target Pengguna + Hover Action CTA -->
+              <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
+                  <span class="ml-1.5 text-slate-600 font-medium">Spektrum autisme & gangguan atensi</span>
+                </div>
+                <span class="font-black text-[#54AA1B] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                  <span>Coba</span>
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </span>
               </div>
             </div>
 
@@ -1228,8 +1504,26 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </section>
 
       <!-- ==================== SECTION 5: TESTIMONI & VALIDASI PRAKTISI ==================== -->
-      <section class="w-full bg-[#F0F7FF] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-blue-100/60">
-        <div class="w-full max-w-[1440px] mx-auto space-y-12">
+      <section
+        class="w-full bg-[#F0F7FF] px-4 sm:px-6 lg:px-10 py-16 sm:py-20 border-b border-blue-100/60 relative overflow-hidden"
+        style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
+      >
+        <!-- Soft Background Ambient Blobs -->
+        <div class="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-[#FF74BC]/10 blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-0 -right-20 w-80 h-80 rounded-full bg-[#3DA5FF]/10 blur-3xl pointer-events-none"></div>
+
+        <!-- Authentic Hand-drawn Doodles for Section 5 (Testimoni) -->
+        <div class="absolute top-12 left-8 pointer-events-none select-none hidden sm:block animate-pulse-subtle">
+          <DoodleOrnament name="heart-outline" color="#FF74BC" :size="38" />
+        </div>
+        <div class="absolute bottom-12 right-10 pointer-events-none select-none hidden sm:block -rotate-6 animate-bounce-subtle">
+          <DoodleOrnament name="star-outline" color="#FFDC58" :size="36" />
+        </div>
+        <div class="absolute top-1/2 right-6 pointer-events-none select-none hidden xl:block animate-float-medium">
+          <DoodleOrnament name="dots-duo" :size="42" />
+        </div>
+
+        <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
           
           <!-- Section Header -->
           <div class="text-center max-w-3xl mx-auto space-y-3">
@@ -1320,6 +1614,20 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- Background Decorative Blobs -->
             <div class="absolute top-0 right-0 w-80 h-80 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
             <div class="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-orange-400/20 blur-3xl pointer-events-none"></div>
+
+            <!-- Authentic Hand-drawn Doodles for CTA Banner -->
+            <div class="absolute top-6 left-8 pointer-events-none select-none hidden sm:block opacity-80 animate-pulse-subtle">
+              <DoodleOrnament name="sparkle" color="#FFDC58" :size="32" />
+            </div>
+            <div class="absolute bottom-6 right-10 pointer-events-none select-none hidden sm:block opacity-75 rotate-12 animate-bounce-subtle">
+              <DoodleOrnament name="star-outline" color="#FFDC58" :size="42" />
+            </div>
+            <div class="absolute top-8 right-12 pointer-events-none select-none hidden md:block opacity-60">
+              <DoodleOrnament name="burst" color="#FFFFFF" :size="30" />
+            </div>
+            <div class="absolute -bottom-2 left-10 pointer-events-none select-none hidden lg:block opacity-70">
+              <DoodleOrnament name="squiggle" color="#FFDC58" :size="65" />
+            </div>
 
             <div class="max-w-2xl space-y-4 relative z-10">
               <span class="inline-block px-4 py-1.5 rounded-full bg-white/20 backdrop-blur text-white text-xs font-black uppercase tracking-wider">
@@ -1424,6 +1732,16 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       />
     </main>
 
+    <!-- ==================== VIEW: SETTINGS & AKUN ==================== -->
+    <main v-else-if="currentNav === 'settings' && isAuthenticated" class="w-full flex-1 flex flex-col">
+      <SettingsView
+        :initial-tab="settingsInitialTab"
+        @back="navigateTo(previousNav || 'beranda')"
+        @navigate="navigateTo"
+        @logout="handleLogout"
+      />
+    </main>
+
     <!-- ==================== VIEW: AUTH (LOGIN & REGISTER PAGE) ==================== -->
     <main v-else-if="currentNav === 'auth'" class="w-full flex-1 flex flex-col">
       <AuthView
@@ -1462,101 +1780,218 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </div>
     </main>
 
-    <!-- ==================== FOOTER ==================== -->
-    <footer v-if="!['learning-player', 'auth'].includes(currentNav)" class="w-full text-white mt-auto relative overflow-hidden shrink-0" style="background: linear-gradient(160deg, #092040 0%, #0F3261 50%, #144080 100%);">
-      <!-- Decorative blobs in footer -->
-      <div class="absolute top-0 right-0 w-96 h-96 rounded-full pointer-events-none opacity-10" style="background: radial-gradient(circle, #3DA5FF 0%, transparent 70%); transform: translate(30%, -30%);"></div>
-      <div class="absolute bottom-0 left-0 w-72 h-72 rounded-full pointer-events-none opacity-10" style="background: radial-gradient(circle, #FF74BC 0%, transparent 70%); transform: translate(-30%, 30%);"></div>
-
-      <!-- Colorful accent bar (all 4 Inkluvia brand colors) -->
+    <!-- ==================== MODERN INCLUSIVE FOOTER ==================== -->
+    <footer
+      v-if="!['learning-player', 'auth'].includes(currentNav)"
+      class="w-full text-white mt-auto relative overflow-hidden shrink-0"
+      style="background: linear-gradient(165deg, #07172E 0%, #0F3261 45%, #13396D 100%);"
+    >
+      <!-- Playful Top Ribbon Accent with Inkluvia 4 Colors -->
       <div class="h-2 w-full flex">
-        <div class="flex-1" style="background: #3DA5FF;"></div>
-        <div class="flex-1" style="background: #FF74BC;"></div>
-        <div class="flex-1" style="background: #FFDC58;"></div>
-        <div class="flex-1" style="background: #74DC2E;"></div>
+        <div class="flex-1 bg-[#3DA5FF]"></div>
+        <div class="flex-1 bg-[#FF74BC]"></div>
+        <div class="flex-1 bg-[#FFDC58]"></div>
+        <div class="flex-1 bg-[#74DC2E]"></div>
       </div>
 
-      <div class="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-10 lg:py-12">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10">
+      <!-- Decorative Ambient Lights & Doodles in Footer -->
+      <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full pointer-events-none opacity-20" style="background: radial-gradient(circle, #3DA5FF 0%, transparent 70%);"></div>
+      <div class="absolute -bottom-24 -left-24 w-80 h-80 rounded-full pointer-events-none opacity-15" style="background: radial-gradient(circle, #FF74BC 0%, transparent 70%);"></div>
+      
+      <!-- Subtle Footer Doodle SVG Ornaments -->
+      <DoodleOrnament type="star" class="absolute top-12 left-1/3 w-8 h-8 text-[#FFDC58]/25 pointer-events-none hidden md:block" />
+      <DoodleOrnament type="burst" class="absolute bottom-16 right-16 w-10 h-10 text-[#74DC2E]/25 pointer-events-none hidden lg:block" />
+      <DoodleOrnament type="squiggly" class="absolute top-8 right-1/4 w-12 h-6 text-[#FF74BC]/25 pointer-events-none hidden sm:block" />
+
+      <div class="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-12 lg:py-16">
+        
+        <!-- Top Row: Kid-Friendly Interactive Mascot Banner -->
+        <div class="mb-12 p-6 sm:p-8 rounded-3xl bg-white/06 border border-white/10 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-6">
+          <div class="flex items-center gap-4 text-center md:text-left">
+            <div class="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-3xl shadow-inner shrink-0">
+              🧊
+            </div>
+            <div>
+              <h4 class="text-base sm:text-lg font-black text-white">
+                Siap Menjelajah Bersama Si Es Batu?
+              </h4>
+              <p class="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
+                Pilih gaya belajarmu hari ini. Ada Standar, Slow, Kontras Tinggi, dan Fokus Mandiri!
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <button
+              @click="navigateTo('materi'); playButtonPop()"
+              class="px-5 py-2.5 rounded-full bg-[#FF7315] hover:bg-[#ff822a] text-white text-xs sm:text-sm font-black transition-all hover:scale-105 active:scale-95 shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <span>Mulai Belajar Gratis</span>
+              <ArrowRight class="w-4 h-4" />
+            </button>
+            <button
+              @click="navigateTo('harga'); playButtonPop()"
+              class="px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-extrabold border border-white/20 transition cursor-pointer"
+            >
+              Lihat Paket
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Footer Links Grid (4 Columns) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 text-left">
           
-          <!-- Column 1: Brand Info -->
-          <div class="lg:col-span-2 space-y-4 text-left">
+          <!-- Column 1: Brand Info & Values -->
+          <div class="lg:col-span-2 space-y-4">
             <div class="flex items-center gap-3">
-              <div class="p-1.5 bg-white rounded-xl shadow-sm">
+              <div class="p-2 bg-white rounded-2xl shadow-sm">
                 <img src="/Logo.png" alt="Logo Inkluvia" class="h-8 w-auto" />
               </div>
-              <span class="text-xl font-black tracking-tight">Inkluvia</span>
+              <div>
+                <span class="text-2xl font-black tracking-tight text-white block leading-none">Inkluvia</span>
+                <span class="text-[11px] font-bold text-[#FFDC58] tracking-wider uppercase mt-1 block">Media Belajar Adaptif</span>
+              </div>
             </div>
-            <p class="text-sm text-slate-300 leading-relaxed max-w-md font-normal">
-              Platform media pembelajaran interaktif & adaptif yang dirancang ramah untuk semua kebutuhan belajar anak Indonesia. Mengusung konsep inklusif, ceria, dan mudah dipahami.
+            
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md font-normal">
+              Platform media edukasi adaptif dan interaktif yang dibangun khusus untuk memberikan kesetaraan belajar bagi anak-anak Indonesia, termasuk anak berkebutuhan khusus (ABK).
             </p>
             
-            <!-- Brand Color Chips -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold" style="background: rgba(61,165,255,0.18); color: #3DA5FF; border: 1px solid rgba(61,165,255,0.3);">● Adaptif</span>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold" style="background: rgba(255,116,188,0.18); color: #FF74BC; border: 1px solid rgba(255,116,188,0.3);">● Inklusif</span>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold" style="background: rgba(116,220,46,0.18); color: #74DC2E; border: 1px solid rgba(116,220,46,0.3);">● Interaktif</span>
+            <!-- Value Badges -->
+            <div class="flex items-center gap-2 flex-wrap pt-1">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#3DA5FF]/20 text-[#3DA5FF] border border-[#3DA5FF]/30">
+                ⭐ Adaptif
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#FF74BC]/20 text-[#FF74BC] border border-[#FF74BC]/30">
+                💖 Inklusif
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#74DC2E]/20 text-[#74DC2E] border border-[#74DC2E]/30">
+                🌿 Ramah Sensorik
+              </span>
             </div>
           </div>
 
-          <!-- Column 2: Navigasi Utama -->
-          <div class="space-y-3 text-left">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Navigasi</h3>
-            <ul class="space-y-2 text-sm text-slate-300 font-medium">
-              <li><button @click="navigateTo('beranda')" class="hover:text-[#3DA5FF] transition cursor-pointer">Beranda</button></li>
-              <li><button @click="navigateTo('materi')" class="hover:text-[#3DA5FF] transition cursor-pointer">Katalog Materi</button></li>
-              <li><button @click="navigateTo('harga')" class="hover:text-[#FF7315] font-semibold transition cursor-pointer">Paket Langganan (Harga)</button></li>
-              <li v-if="isAdmin"><button @click="navigateTo('admin')" class="font-bold transition cursor-pointer" style="color: #FF7315;">Dashboard Admin (CMS)</button></li>
+          <!-- Column 2: Navigasi Cepat -->
+          <div class="space-y-3">
+            <h3 class="text-xs font-black text-amber-400 uppercase tracking-widest">Navigasi</h3>
+            <ul class="space-y-2.5 text-xs sm:text-sm text-slate-300 font-medium">
+              <li>
+                <button @click="navigateTo('beranda')" class="hover:text-[#3DA5FF] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
+                  <ArrowRight class="w-3 h-3 text-[#3DA5FF]" /> Beranda
+                </button>
+              </li>
+              <li>
+                <button @click="navigateTo('materi')" class="hover:text-[#3DA5FF] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
+                  <ArrowRight class="w-3 h-3 text-[#3DA5FF]" /> Jelajahi Materi (SD, SMP, SMA)
+                </button>
+              </li>
+              <li>
+                <button @click="navigateTo('harga')" class="hover:text-[#FF7315] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
+                  <ArrowRight class="w-3 h-3 text-[#FF7315]" /> Paket Langganan & Harga
+                </button>
+              </li>
+              <li v-if="isAuthenticated">
+                <button @click="openSettings('profile')" class="hover:text-[#74DC2E] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
+                  <ArrowRight class="w-3 h-3 text-[#74DC2E]" /> Pengaturan Akun
+                </button>
+              </li>
+              <li v-if="isAdmin">
+                <button @click="navigateTo('admin')" class="hover:text-orange-400 hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold text-orange-400">
+                  <ArrowRight class="w-3 h-3 text-orange-400" /> CMS Admin Inkluvia
+                </button>
+              </li>
             </ul>
           </div>
 
-          <!-- Column 3: Mata Pelajaran -->
-          <div class="space-y-3 text-left">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Mata Pelajaran</h3>
-            <ul class="space-y-2 text-sm text-slate-300 font-medium">
-              <li><button @click="navigateTo('materi')" class="hover:text-[#FFDC58] transition cursor-pointer">IPAS (Sains & Sosial)</button></li>
-              <li><button @click="navigateTo('materi')" class="hover:text-[#FFDC58] transition cursor-pointer">Matematika Interaktif</button></li>
-              <li><button @click="navigateTo('materi')" class="hover:text-[#FFDC58] transition cursor-pointer">Bahasa Indonesia</button></li>
-              <li><button @click="navigateTo('materi')" class="hover:text-[#FFDC58] transition cursor-pointer">Lembar Kerja & Asesmen</button></li>
+          <!-- Column 3: 4 Mode Belajar Inkluvia -->
+          <div class="space-y-3">
+            <h3 class="text-xs font-black text-emerald-400 uppercase tracking-widest">4 Mode Belajar</h3>
+            <ul class="space-y-2.5 text-xs sm:text-sm text-slate-300 font-medium">
+              <li class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#0F3261] ring-2 ring-[#3587CE]"></span>
+                <span class="font-bold text-white">Standar:</span>
+                <span class="text-slate-400 text-xs">Audio Visual Dinamis</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#3DA5FF] ring-2 ring-blue-300"></span>
+                <span class="font-bold text-white">Slow:</span>
+                <span class="text-slate-400 text-xs">Artikulasi Bertahap</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200"></span>
+                <span class="font-bold text-white">Kontras Tinggi:</span>
+                <span class="text-slate-400 text-xs">Rasio Kontras Optimal</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#74DC2E] ring-2 ring-emerald-300"></span>
+                <span class="font-bold text-white">Fokus Mandiri:</span>
+                <span class="text-slate-400 text-xs">Minimalis Bebas Distraksi</span>
+              </li>
             </ul>
           </div>
 
-          <!-- Column 4: Metode Belajar -->
-          <div class="space-y-3 text-left">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Mode Belajar</h3>
-            <ul class="space-y-2 text-sm text-slate-300 font-medium">
-              <li class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full shrink-0" style="background: #FF7315;"></span> Standard Mode (Ceria)
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full shrink-0" style="background: #3DA5FF;"></span> Focus Mode (Tenang)
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full shrink-0" style="background: #74DC2E;"></span> Kuis & Evaluasi Mandiri
-              </li>
-            </ul>
+          <!-- Column 4: Dukungan & Komunitas -->
+          <div class="space-y-3">
+            <h3 class="text-xs font-black text-pink-400 uppercase tracking-widest">Dukungan & Komunitas</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Punya pertanyaan seputar kurikulum inklusif atau membutuhkan demo untuk sekolah?
+            </p>
+            <div class="space-y-2 pt-1 text-xs text-slate-300">
+              <div class="flex items-center gap-2">
+                <span class="text-[#3DA5FF] font-bold">📧 Email:</span>
+                <a href="mailto:halo@inkluvia.id" class="hover:text-white underline">halo@inkluvia.id</a>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[#74DC2E] font-bold">⏰ Layanan:</span>
+                <span>Senin - Jumat (08.00 - 17.00 WIB)</span>
+              </div>
+            </div>
+
+            <!-- Social Links / Community Pills -->
+            <div class="flex items-center gap-2.5 pt-2">
+              <a
+                href="#"
+                @click.prevent
+                title="Komunitas Edukasi WhatsApp"
+                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#74DC2E] hover:text-slate-900 text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+              >
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href="#"
+                @click.prevent
+                title="Instagram Resmi Inkluvia"
+                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#FF74BC] hover:text-white text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+              >
+                <span>Instagram</span>
+              </a>
+              <a
+                href="#"
+                @click.prevent
+                title="YouTube Edukasi Inkluvia"
+                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#FF7315] hover:text-white text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+              >
+                <span>YouTube</span>
+              </a>
+            </div>
           </div>
 
         </div>
 
-        <!-- Bottom Copyright -->
-        <div class="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400" style="border-top: 1px solid rgba(255,255,255,0.10);">
-          <p>© 2026 <span class="font-bold text-white">Inkluvia</span>. Hak Cipta Dilindungi. Media Pembelajaran Adaptif & Inklusif.</p>
-          <div class="flex items-center gap-6 font-medium">
+        <!-- Bottom Copyright & Legal -->
+        <div class="mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 border-t border-white/10">
+          <p>© 2026 <span class="font-bold text-white">Inkluvia</span>. Hak Cipta Dilindungi. Media Belajar Inklusif Indonesia.</p>
+          <div class="flex items-center gap-5 font-medium flex-wrap justify-center">
+            <span class="text-slate-400">🛡️ WCAG 2.1 AA Compliant</span>
+            <span class="text-slate-400">•</span>
             <a href="#" @click.prevent class="hover:text-white transition">Kebijakan Privasi</a>
+            <span class="text-slate-400">•</span>
             <a href="#" @click.prevent class="hover:text-white transition">Syarat & Ketentuan</a>
+            <span class="text-slate-400">•</span>
             <a href="#" @click.prevent class="hover:text-white transition">Bantuan</a>
           </div>
         </div>
       </div>
     </footer>
-
-    <!-- Settings & Preferences Modal -->
-    <SettingsModal
-      :is-open="showSettingsModal"
-      :initial-tab="settingsInitialTab"
-      @close="showSettingsModal = false"
-    />
   </div>
 </template>
 
