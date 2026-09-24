@@ -197,6 +197,10 @@ const handleSave = async () => {
     alert('Judul materi wajib diisi')
     return
   }
+  if (isUploadingVideo.value || isUploadingImage.value) {
+    alert('Tunggu sebentar, upload video/gambar masih berjalan. Simpan setelah upload selesai (100%).')
+    return
+  }
   if (isEditing.value && currentForm.value.id) {
     await updateMateri(currentForm.value.id, currentForm.value)
   } else {
