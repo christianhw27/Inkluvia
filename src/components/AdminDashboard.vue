@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import {
-  materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri
+  materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri, RELIABLE_MODE_VIDEOS, sanitizeVideoUrl
 } from '../lib/materiService'
 import { currentUser, isAdmin, logoutUser } from '../lib/authService'
 import { uploadVideo, uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
@@ -70,22 +70,22 @@ function getEmptyForm() {
     standardContent: {
       title: 'Petualangan Si Es Batu (Standar)',
       text: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud dari padat, cair, hingga gas!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.standard
     },
     slowContent: {
       title: 'Petualangan Si Es Batu (Slow)',
       text: 'Es batu dipanaskan secara perlahan... berubah menjadi air cair, lalu menguap menjadi gas di udara.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.slow
     },
     highContrastContent: {
       title: 'PERUBAHAN WUJUD BENDA',
       text: 'ES BATU (PADAT) -> AIR (CAIR) -> UAP (GAS). PROSES MENCAIR, MENGUAP, DAN MENGEMBUN.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.high_contrast
     },
     focusContent: {
       title: 'Es Batu = Perubahan Wujud',
       text: 'Es batu (Padat) → Air (Cair) → Uap (Gas). Kamu hebat sudah belajar hari ini!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.focus
     },
     assessment: {
       title: 'Asesmen & Kuis Pemahaman',
@@ -224,13 +224,7 @@ const doUpload = async (file, modeKey) => {
   uploadProgress.value = 0
 
   if (!isCloudinaryConfigured) {
-    const samples = {
-      standard: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      slow: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-      high_contrast: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-      focus: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
-    }
-    currentForm.value[field].videoUrl = samples[modeKey] || samples.standard
+    currentForm.value[field].videoUrl = RELIABLE_MODE_VIDEOS[modeKey] || RELIABLE_MODE_VIDEOS.standard
     uploadTargetKey.value = null
     return
   }

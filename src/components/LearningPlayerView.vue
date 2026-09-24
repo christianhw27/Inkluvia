@@ -20,6 +20,7 @@ import {
   Video
 } from '@lucide/vue'
 import { currentUser } from '../lib/authService'
+import { RELIABLE_MODE_VIDEOS, sanitizeVideoUrl } from '../lib/materiService'
 
 const props = defineProps({
   materi: {
@@ -127,43 +128,50 @@ const activeContent = computed(() => {
     return props.materi.slowContent || {
       title: `${props.materi.title || ''} (Slow Mode)`,
       text: props.materi.description || 'Penjelasan diputar dengan tempo lebih lambat.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.slow
     }
   }
   if (currentMode.value === 'high_contrast') {
     return props.materi.highContrastContent || {
       title: props.materi.title?.toUpperCase() || 'HIGH CONTRAST MODE',
       text: props.materi.description?.toUpperCase() || 'HURUF BESAR KONTRAS TINGGI',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.high_contrast
     }
   }
   if (currentMode.value === 'focus') {
     return props.materi.focusContent || {
       title: props.materi.title || 'Focus Mode',
       text: props.materi.description || 'Tampilan sederhana bebas distraksi.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: RELIABLE_MODE_VIDEOS.focus
     }
   }
   // Standard
   return props.materi.standardContent || {
     title: props.materi.title || 'Standar Mode',
     text: props.materi.description || 'Penjelasan materi lengkap.',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    videoUrl: RELIABLE_MODE_VIDEOS.standard
   }
 })
 
-// Video Source
+// Video Source — prioritas: URL Cloudinary/custom > sanitize URL 403 > fallback CDN
 const activeVideoSource = computed(() => {
   const url = activeContent.value?.videoUrl
-  if (url && url.startsWith('http')) return url
-  const samples = {
-    standard: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    slow: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    high_contrast: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    focus: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+  // Jika URL ada dan bukan commondatastorage yang 403, langsung pakai
+  if (url && url.startsWith('http')) {
+    return sanitizeVideoUrl(url, currentMode.value) || RELIABLE_MODE_VIDEOS[currentMode.value] || RELIABLE_MODE_VIDEOS.standard
   }
-  return samples[currentMode.value] || samples.standard
+  // Jika kosong, fallback ke reliable CDN
+  return RELIABLE_MODE_VIDEOS[currentMode.value] || RELIABLE_MODE_VIDEOS.standard
 })
+
+const handleVideoError = (e) => {
+  console.warn('Video playback error, restoring reliable CDN source:', e)
+  const fallback = RELIABLE_MODE_VIDEOS[currentMode.value] || RELIABLE_MODE_VIDEOS.standard
+  if (videoRef.value && videoRef.value.src !== fallback) {
+    videoRef.value.src = fallback
+    videoRef.value.load()
+  }
+}
 
 // Player controls
 const togglePlay = () => {
@@ -509,6 +517,7 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
                 :src="activeVideoSource"
                 @timeupdate="handleTimeUpdate"
                 @ended="handleVideoEnded"
+                @error="handleVideoError"
                 class="w-full h-full object-contain cursor-pointer"
                 @click="togglePlay"
                 playsinline

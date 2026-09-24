@@ -3,6 +3,49 @@ import { supabase, isSupabaseConfigured } from './supabaseClient'
 
 const STORAGE_KEY = 'inkluvia_materi_list_v3'
 
+export const RELIABLE_MODE_VIDEOS = {
+  standard: 'https://res.cloudinary.com/demo/video/upload/elephants.mp4',
+  slow: 'https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4',
+  high_contrast: 'https://res.cloudinary.com/demo/video/upload/dog.mp4',
+  focus: 'https://www.w3schools.com/html/mov_bbb.mp4'
+}
+
+/**
+ * Sanitize video URL — HANYA replace URL Google commondatastorage yang sudah 403.
+ * URL Cloudinary, URL custom, dan string kosong ('') dibiarkan apa adanya.
+ */
+export function sanitizeVideoUrl(url, mode = 'standard') {
+  if (typeof url === 'string' && (url.includes('commondatastorage.googleapis.com') || url.includes('gtv-videos-bucket'))) {
+    return RELIABLE_MODE_VIDEOS[mode] || RELIABLE_MODE_VIDEOS.standard
+  }
+  // Jika URL valid (Cloudinary, custom, dsb) atau kosong — kembalikan apa adanya
+  return url || ''
+}
+
+/**
+ * Sanitize seluruh content video di satu item materi.
+ * Hanya mengganti URL Google commondatastorage yang 403, tidak menimpa URL lain.
+ */
+export function sanitizeMateriItem(item) {
+  if (!item) return item
+  const clean = { ...item }
+  const modes = [
+    { key: 'standardContent', mode: 'standard' },
+    { key: 'slowContent', mode: 'slow' },
+    { key: 'highContrastContent', mode: 'high_contrast' },
+    { key: 'focusContent', mode: 'focus' }
+  ]
+  for (const { key, mode } of modes) {
+    if (clean[key] && clean[key].videoUrl) {
+      clean[key] = {
+        ...clean[key],
+        videoUrl: sanitizeVideoUrl(clean[key].videoUrl, mode)
+      }
+    }
+  }
+  return clean
+}
+
 const initialMateri = [
   {
     id: 'materi-1',
@@ -25,22 +68,22 @@ const initialMateri = [
     standardContent: {
       title: 'Petualangan Si Es Batu (Standar)',
       text: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud dari padat, cair, hingga gas!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/elephants.mp4'
     },
     slowContent: {
       title: 'Petualangan Si Es Batu (Slow)',
       text: 'Es batu dipanaskan secara perlahan... berubah menjadi air cair, lalu menguap menjadi gas di udara.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4'
     },
     highContrastContent: {
       title: 'PERUBAHAN WUJUD BENDA',
       text: 'ES BATU (PADAT) -> AIR (CAIR) -> UAP (GAS). PROSES MENCAIR, MENGUAP, DAN MENGEMBUN.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/dog.mp4'
     },
     focusContent: {
       title: 'Es Batu = Perubahan Wujud',
       text: 'Es batu (Padat) → Air (Cair) → Uap (Gas). Kamu hebat sudah belajar hari ini!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
     },
     assessment: {
       title: 'Asesmen Pemahaman Materi Es Batu',
@@ -101,22 +144,22 @@ const initialMateri = [
     standardContent: {
       title: 'Berhitung Bersama Sahabat Hutan (Standar)',
       text: 'Ayo berhitung bersama kelinci dan tupai ceria di hutan ajaib!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/elephants.mp4'
     },
     slowContent: {
       title: 'Berhitung Bersama Sahabat Hutan (Slow)',
       text: 'Satu apel... ditambah satu apel... menjadi dua apel.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4'
     },
     highContrastContent: {
       title: 'PENJUMLAHAN DASAR',
       text: '1 + 1 = 2. AYO BERHITUNG BERSAMA.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/dog.mp4'
     },
     focusContent: {
       title: 'Konsep Angka',
       text: '1 + 1 = 2. Fokus pada jumlah buah.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
     },
     assessment: {
       title: 'Kuis Berhitung Ceria',
@@ -150,22 +193,22 @@ const initialMateri = [
     standardContent: {
       title: 'Mengenal Tata Surya & Planet Ajaib (Standar)',
       text: 'Selamat datang di antariksa! Mari kita terbang mengelilingi 8 planet yang mengorbit matahari.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/elephants.mp4'
     },
     slowContent: {
       title: 'Mengenal Tata Surya & Planet Ajaib (Slow)',
       text: 'Matahari adalah bintang di pusat tata surya kita... Planet berputar mengelilinginya.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4'
     },
     highContrastContent: {
       title: 'SISTEM TATA SURYA',
       text: 'MATAHARI -> MERKURIUS -> VENUS -> BUMI -> MARS -> JUPITER -> SATURNUS -> URANUS -> NEPTUNUS.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/dog.mp4'
     },
     focusContent: {
       title: 'Tata Surya Inti',
       text: 'Matahari adalah pusat. Planet-planet mengitari matahari secara teratur.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
     },
     assessment: {
       title: 'Kuis Cepat Tata Surya',
@@ -199,22 +242,22 @@ const initialMateri = [
     standardContent: {
       title: 'Dunia Mikroskopis: Sel & Kehidupan (Standar)',
       text: 'Semua makhluk hidup tersusun dari unit dasar bernama sel. Mari kita selami bagian dalamnya!',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/elephants.mp4'
     },
     slowContent: {
       title: 'Dunia Mikroskopis: Sel & Kehidupan (Slow)',
       text: 'Sel adalah unit terkecil makhluk hidup... memiliki membran luar dan inti sel.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4'
     },
     highContrastContent: {
       title: 'STRUKTUR SEL DASAR',
       text: 'MEMBRAN SEL -> SITOPLASMA -> INTI SEL (NUKLEUS) -> MITOKONDRIA.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      videoUrl: 'https://res.cloudinary.com/demo/video/upload/dog.mp4'
     },
     focusContent: {
       title: 'Konsep Sel',
       text: 'Sel adalah penyusun makhluk hidup. Mengatur energi dan kehidupan.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4'
+      videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
     },
     assessment: {
       title: 'Asesmen Struktur Sel',
@@ -266,7 +309,7 @@ async function loadFromSupabase() {
 
     if (data && data.length > 0) {
       // Supabase menyimpan JSON fields, perlu parse jika berbentuk string
-      materiList.value = data.map(row => ({
+      materiList.value = data.map(row => sanitizeMateriItem({
         ...row,
         types: typeof row.types === 'string' ? JSON.parse(row.types) : (row.types || []),
         steps: typeof row.steps === 'string' ? JSON.parse(row.steps) : (row.steps || []),
@@ -296,15 +339,16 @@ function loadFromLocalStorage() {
     if (cached) {
       const parsed = JSON.parse(cached)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        materiList.value = parsed
+        materiList.value = parsed.map(sanitizeMateriItem)
         selectedMateri.value = materiList.value[0]
+        saveToLocalStorage()
         return
       }
     }
   } catch (e) {
     console.error('Failed to load cached materi:', e)
   }
-  materiList.value = [...initialMateri]
+  materiList.value = initialMateri.map(sanitizeMateriItem)
   selectedMateri.value = materiList.value[0]
   saveToLocalStorage()
 }
@@ -382,35 +426,36 @@ export async function addMateri(newItem) {
     created_at: new Date().toISOString(),
     ...newItem
   }
+  const cleanItem = sanitizeMateriItem(itemWithId)
 
-  materiList.value.unshift(itemWithId)
+  materiList.value.unshift(cleanItem)
   saveToLocalStorage()
 
   if (isSupabaseConfigured) {
     try {
       const supabaseRow = {
-        id: itemWithId.id,
-        title: itemWithId.title,
-        jenjang: itemWithId.jenjang,
-        mata_pelajaran: itemWithId.mataPelajaran,
-        level: itemWithId.level,
-        badge: itemWithId.badge,
-        image: itemWithId.image,
-        description: itemWithId.description,
-        duration: itemWithId.duration,
-        activity_type: itemWithId.activityType,
-        learning_options: itemWithId.learningOptions,
-        types: itemWithId.types,
-        steps: itemWithId.steps,
-        standard_config: itemWithId.standardConfig,
-        focus_config: itemWithId.focusConfig,
-        learning_points: itemWithId.learningPoints,
-        standard_content: itemWithId.standardContent,
-        slow_content: itemWithId.slowContent,
-        high_contrast_content: itemWithId.highContrastContent,
-        focus_content: itemWithId.focusContent,
-        assessment: itemWithId.assessment,
-        created_at: itemWithId.created_at
+        id: cleanItem.id,
+        title: cleanItem.title,
+        jenjang: cleanItem.jenjang,
+        mata_pelajaran: cleanItem.mataPelajaran,
+        level: cleanItem.level,
+        badge: cleanItem.badge,
+        image: cleanItem.image,
+        description: cleanItem.description,
+        duration: cleanItem.duration,
+        activity_type: cleanItem.activityType,
+        learning_options: cleanItem.learningOptions,
+        types: cleanItem.types,
+        steps: cleanItem.steps,
+        standard_config: cleanItem.standardConfig,
+        focus_config: cleanItem.focusConfig,
+        learning_points: cleanItem.learningPoints,
+        standard_content: cleanItem.standardContent,
+        slow_content: cleanItem.slowContent,
+        high_contrast_content: cleanItem.highContrastContent,
+        focus_content: cleanItem.focusContent,
+        assessment: cleanItem.assessment,
+        created_at: cleanItem.created_at
       }
       const { error } = await supabase.from('materi').insert([supabaseRow])
       if (error) console.warn('Supabase insert warning:', error.message)
@@ -419,7 +464,7 @@ export async function addMateri(newItem) {
     }
   }
 
-  return itemWithId
+  return cleanItem
 }
 
 /**
@@ -429,7 +474,7 @@ export async function updateMateri(id, updatedFields) {
   const index = materiList.value.findIndex((m) => m.id === id)
   if (index === -1) return
 
-  materiList.value[index] = { ...materiList.value[index], ...updatedFields }
+  materiList.value[index] = sanitizeMateriItem({ ...materiList.value[index], ...updatedFields })
   if (selectedMateri.value?.id === id) {
     selectedMateri.value = materiList.value[index]
   }
