@@ -282,12 +282,19 @@ export const isLoadingMateri = ref(false)
 // Init — load dari Supabase dulu, fallback ke localStorage
 initMateri()
 
+/**
+ * Inisialisasi materi:
+ * 1. Supabase = source of truth (jika terkonfigurasi)
+ * 2. Kalau Supabase kosong → seed initialMateri ke Supabase
+ * 3. localStorage hanya sebagai cache offline
+ */
 async function initMateri() {
   isLoadingMateri.value = true
   try {
     if (isSupabaseConfigured) {
       await loadFromSupabase()
     } else {
+      console.warn('[Inkluvia] Supabase belum dikonfigurasi — menggunakan localStorage saja.')
       loadFromLocalStorage()
     }
   } catch (e) {
@@ -298,6 +305,9 @@ async function initMateri() {
   }
 }
 
+/**
+ * Load dari Supabase. Jika tabel kosong, otomatis seed data awal.
+ */
 async function loadFromSupabase() {
   try {
     const { data, error } = await supabase
@@ -308,29 +318,98 @@ async function loadFromSupabase() {
     if (error) throw error
 
     if (data && data.length > 0) {
-      // Supabase menyimpan JSON fields, perlu parse jika berbentuk string
-      materiList.value = data.map(row => sanitizeMateriItem({
-        ...row,
-        types: typeof row.types === 'string' ? JSON.parse(row.types) : (row.types || []),
-        steps: typeof row.steps === 'string' ? JSON.parse(row.steps) : (row.steps || []),
-        learningPoints: typeof row.learning_points === 'string' ? JSON.parse(row.learning_points) : (row.learningPoints || row.learning_points || []),
-        standardConfig: typeof row.standard_config === 'string' ? JSON.parse(row.standard_config) : (row.standardConfig || row.standard_config || {}),
-        focusConfig: typeof row.focus_config === 'string' ? JSON.parse(row.focus_config) : (row.focusConfig || row.focus_config || {}),
-        standardContent: typeof row.standard_content === 'string' ? JSON.parse(row.standard_content) : (row.standardContent || row.standard_content || {}),
-        slowContent: typeof row.slow_content === 'string' ? JSON.parse(row.slow_content) : (row.slowContent || row.slow_content || {}),
-        highContrastContent: typeof row.high_contrast_content === 'string' ? JSON.parse(row.high_contrast_content) : (row.highContrastContent || row.high_contrast_content || {}),
-        focusContent: typeof row.focus_content === 'string' ? JSON.parse(row.focus_content) : (row.focusContent || row.focus_content || {}),
-        assessment: typeof row.assessment === 'string' ? JSON.parse(row.assessment) : (row.assessment || null)
-      }))
+      // Data ada di Supabase — gunakan sebagai sumber utama
+      materiList.value = data.map(row => sanitizeMateriItem(parseSupabaseRow(row)))
       selectedMateri.value = materiList.value[0] || null
-      saveToLocalStorage()
+      saveToLocalStorage() // Cache ke localStorage
+      console.log(`[Inkluvia] ✅ Loaded ${data.length} materi dari Supabase`)
       return
     }
+
+    // Supabase kosong — seed initialMateri ke Supabase
+    console.log('[Inkluvia] Supabase kosong, seeding data awal...')
+    await seedInitialMateriToSupabase()
+    return
   } catch (err) {
     console.warn('Supabase load failed, using localStorage:', err.message)
   }
-  // Jika Supabase kosong atau error, pakai localStorage
+  // Fallback ke localStorage kalau Supabase benar-benar gagal
   loadFromLocalStorage()
+}
+
+/**
+ * Parse row Supabase ke format yang dipakai di frontend
+ */
+function parseSupabaseRow(row) {
+  return {
+    ...row,
+    types: typeof row.types === 'string' ? JSON.parse(row.types) : (row.types || []),
+    steps: typeof row.steps === 'string' ? JSON.parse(row.steps) : (row.steps || []),
+    learningPoints: typeof row.learning_points === 'string' ? JSON.parse(row.learning_points) : (row.learningPoints || row.learning_points || []),
+    standardConfig: typeof row.standard_config === 'string' ? JSON.parse(row.standard_config) : (row.standardConfig || row.standard_config || {}),
+    focusConfig: typeof row.focus_config === 'string' ? JSON.parse(row.focus_config) : (row.focusConfig || row.focus_config || {}),
+    standardContent: typeof row.standard_content === 'string' ? JSON.parse(row.standard_content) : (row.standardContent || row.standard_content || {}),
+    slowContent: typeof row.slow_content === 'string' ? JSON.parse(row.slow_content) : (row.slowContent || row.slow_content || {}),
+    highContrastContent: typeof row.high_contrast_content === 'string' ? JSON.parse(row.high_contrast_content) : (row.highContrastContent || row.high_contrast_content || {}),
+    focusContent: typeof row.focus_content === 'string' ? JSON.parse(row.focus_content) : (row.focusContent || row.focus_content || {}),
+    assessment: typeof row.assessment === 'string' ? JSON.parse(row.assessment) : (row.assessment || null)
+  }
+}
+
+/**
+ * Konversi item materi frontend ke format kolom Supabase
+ */
+function toSupabaseRow(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    jenjang: item.jenjang,
+    mata_pelajaran: item.mataPelajaran,
+    level: item.level,
+    badge: item.badge,
+    image: item.image,
+    description: item.description,
+    duration: item.duration,
+    activity_type: item.activityType,
+    learning_options: item.learningOptions,
+    types: item.types,
+    steps: item.steps,
+    standard_config: item.standardConfig,
+    focus_config: item.focusConfig,
+    learning_points: item.learningPoints,
+    standard_content: item.standardContent,
+    slow_content: item.slowContent,
+    high_contrast_content: item.highContrastContent,
+    focus_content: item.focusContent,
+    assessment: item.assessment,
+    created_at: item.created_at || new Date().toISOString()
+  }
+}
+
+/**
+ * Seed initialMateri ke Supabase (dipanggil sekali saat tabel kosong)
+ */
+async function seedInitialMateriToSupabase() {
+  try {
+    const rows = initialMateri.map(item => toSupabaseRow(sanitizeMateriItem(item)))
+    const { error } = await supabase.from('materi').insert(rows)
+    if (error) {
+      console.warn('Seed to Supabase failed:', error.message)
+      loadFromLocalStorage()
+      return
+    }
+    // Reload dari Supabase setelah seed berhasil
+    const { data } = await supabase.from('materi').select('*').order('created_at', { ascending: false })
+    if (data && data.length > 0) {
+      materiList.value = data.map(row => sanitizeMateriItem(parseSupabaseRow(row)))
+      selectedMateri.value = materiList.value[0] || null
+      saveToLocalStorage()
+      console.log(`[Inkluvia] ✅ Seeded ${data.length} materi ke Supabase`)
+    }
+  } catch (err) {
+    console.warn('Seed Supabase error:', err)
+    loadFromLocalStorage()
+  }
 }
 
 function loadFromLocalStorage() {
@@ -341,7 +420,6 @@ function loadFromLocalStorage() {
       if (Array.isArray(parsed) && parsed.length > 0) {
         materiList.value = parsed.map(sanitizeMateriItem)
         selectedMateri.value = materiList.value[0]
-        saveToLocalStorage()
         return
       }
     }
@@ -433,32 +511,9 @@ export async function addMateri(newItem) {
 
   if (isSupabaseConfigured) {
     try {
-      const supabaseRow = {
-        id: cleanItem.id,
-        title: cleanItem.title,
-        jenjang: cleanItem.jenjang,
-        mata_pelajaran: cleanItem.mataPelajaran,
-        level: cleanItem.level,
-        badge: cleanItem.badge,
-        image: cleanItem.image,
-        description: cleanItem.description,
-        duration: cleanItem.duration,
-        activity_type: cleanItem.activityType,
-        learning_options: cleanItem.learningOptions,
-        types: cleanItem.types,
-        steps: cleanItem.steps,
-        standard_config: cleanItem.standardConfig,
-        focus_config: cleanItem.focusConfig,
-        learning_points: cleanItem.learningPoints,
-        standard_content: cleanItem.standardContent,
-        slow_content: cleanItem.slowContent,
-        high_contrast_content: cleanItem.highContrastContent,
-        focus_content: cleanItem.focusContent,
-        assessment: cleanItem.assessment,
-        created_at: cleanItem.created_at
-      }
-      const { error } = await supabase.from('materi').insert([supabaseRow])
+      const { error } = await supabase.from('materi').insert([toSupabaseRow(cleanItem)])
       if (error) console.warn('Supabase insert warning:', error.message)
+      else console.log(`[Inkluvia] ✅ Materi "${cleanItem.title}" berhasil disimpan ke Supabase`)
     } catch (err) {
       console.warn('Supabase sync skipped:', err)
     }
@@ -468,46 +523,29 @@ export async function addMateri(newItem) {
 }
 
 /**
- * Update Materi
+ * Update Materi — update reactive state + localStorage + Supabase
  */
 export async function updateMateri(id, updatedFields) {
   const index = materiList.value.findIndex((m) => m.id === id)
   if (index === -1) return
 
-  materiList.value[index] = sanitizeMateriItem({ ...materiList.value[index], ...updatedFields })
+  const updated = sanitizeMateriItem({ ...materiList.value[index], ...updatedFields })
+  materiList.value[index] = updated
   if (selectedMateri.value?.id === id) {
-    selectedMateri.value = materiList.value[index]
+    selectedMateri.value = updated
   }
   saveToLocalStorage()
 
   if (isSupabaseConfigured) {
     try {
-      const supabaseFields = {
-        title: updatedFields.title,
-        jenjang: updatedFields.jenjang,
-        mata_pelajaran: updatedFields.mataPelajaran,
-        level: updatedFields.level,
-        badge: updatedFields.badge,
-        image: updatedFields.image,
-        description: updatedFields.description,
-        duration: updatedFields.duration,
-        types: updatedFields.types,
-        steps: updatedFields.steps,
-        standard_config: updatedFields.standardConfig,
-        focus_config: updatedFields.focusConfig,
-        learning_points: updatedFields.learningPoints,
-        standard_content: updatedFields.standardContent,
-        slow_content: updatedFields.slowContent,
-        high_contrast_content: updatedFields.highContrastContent,
-        focus_content: updatedFields.focusContent,
-        assessment: updatedFields.assessment
-      }
+      const row = toSupabaseRow(updated)
+      delete row.id // id tidak perlu di-update, sudah jadi WHERE clause
+      delete row.created_at // jangan timpa created_at
       // Hapus field undefined
-      Object.keys(supabaseFields).forEach(
-        k => supabaseFields[k] === undefined && delete supabaseFields[k]
-      )
-      const { error } = await supabase.from('materi').update(supabaseFields).eq('id', id)
+      Object.keys(row).forEach(k => row[k] === undefined && delete row[k])
+      const { error } = await supabase.from('materi').update(row).eq('id', id)
       if (error) console.warn('Supabase update warning:', error.message)
+      else console.log(`[Inkluvia] ✅ Materi "${updated.title}" berhasil diupdate di Supabase`)
     } catch (err) {
       console.warn('Supabase update skipped:', err)
     }
@@ -528,6 +566,7 @@ export async function deleteMateri(id) {
     try {
       const { error } = await supabase.from('materi').delete().eq('id', id)
       if (error) console.warn('Supabase delete warning:', error.message)
+      else console.log(`[Inkluvia] ✅ Materi berhasil dihapus dari Supabase`)
     } catch (err) {
       console.warn('Supabase delete skipped:', err)
     }
@@ -535,10 +574,24 @@ export async function deleteMateri(id) {
 }
 
 /**
- * Reset ke data default
+ * Reset ke data default — juga reset di Supabase
  */
-export function resetMateri() {
-  materiList.value = [...initialMateri]
+export async function resetMateri() {
+  materiList.value = initialMateri.map(sanitizeMateriItem)
   selectedMateri.value = materiList.value[0]
   saveToLocalStorage()
+
+  if (isSupabaseConfigured) {
+    try {
+      // Hapus semua data lama di Supabase
+      await supabase.from('materi').delete().neq('id', '')
+      // Seed ulang
+      const rows = materiList.value.map(toSupabaseRow)
+      const { error } = await supabase.from('materi').insert(rows)
+      if (error) console.warn('Supabase reset warning:', error.message)
+      else console.log('[Inkluvia] ✅ Data materi berhasil di-reset di Supabase')
+    } catch (err) {
+      console.warn('Supabase reset skipped:', err)
+    }
+  }
 }
