@@ -511,8 +511,8 @@ export async function addMateri(newItem) {
 
   if (isSupabaseConfigured) {
     try {
-      const { error } = await supabase.from('materi').insert([toSupabaseRow(cleanItem)])
-      if (error) console.warn('Supabase insert warning:', error.message)
+      const { error } = await supabase.from('materi').upsert([toSupabaseRow(cleanItem)], { onConflict: 'id' })
+      if (error) console.warn('Supabase upsert warning:', error.message)
       else console.log(`[Inkluvia] ✅ Materi "${cleanItem.title}" berhasil disimpan ke Supabase`)
     } catch (err) {
       console.warn('Supabase sync skipped:', err)
@@ -539,15 +539,15 @@ export async function updateMateri(id, updatedFields) {
   if (isSupabaseConfigured) {
     try {
       const row = toSupabaseRow(updated)
-      delete row.id // id tidak perlu di-update, sudah jadi WHERE clause
       delete row.created_at // jangan timpa created_at
       // Hapus field undefined
       Object.keys(row).forEach(k => row[k] === undefined && delete row[k])
-      const { error } = await supabase.from('materi').update(row).eq('id', id)
-      if (error) console.warn('Supabase update warning:', error.message)
-      else console.log(`[Inkluvia] ✅ Materi "${updated.title}" berhasil diupdate di Supabase`)
+      // Gunakan upsert agar tetap masuk walaupun row belum ada di Supabase
+      const { error } = await supabase.from('materi').upsert(row, { onConflict: 'id' })
+      if (error) console.warn('Supabase upsert warning:', error.message)
+      else console.log(`[Inkluvia] ✅ Materi "${updated.title}" berhasil disimpan ke Supabase`)
     } catch (err) {
-      console.warn('Supabase update skipped:', err)
+      console.warn('Supabase upsert skipped:', err)
     }
   }
 }
@@ -593,5 +593,26 @@ export async function resetMateri() {
     } catch (err) {
       console.warn('Supabase reset skipped:', err)
     }
+  }
+}
+
+/**
+ * Force-sync semua materi di memori (localStorage) ke Supabase via upsert.
+ * Panggil ini dari Admin Dashboard setelah upload video agar data dipastikan masuk Supabase.
+ */
+export async function forceSyncToSupabase() {
+  if (!isSupabaseConfigured) return { success: false, error: 'Supabase tidak dikonfigurasi' }
+  try {
+    const rows = materiList.value.map(toSupabaseRow)
+    const { error } = await supabase.from('materi').upsert(rows, { onConflict: 'id' })
+    if (error) {
+      console.warn('Force sync warning:', error.message)
+      return { success: false, error: error.message }
+    }
+    console.log(`[Inkluvia] ✅ Force sync ${rows.length} materi ke Supabase berhasil`)
+    return { success: true, count: rows.length }
+  } catch (err) {
+    console.warn('Force sync error:', err)
+    return { success: false, error: err.message }
   }
 }

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import {
-  materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri, RELIABLE_MODE_VIDEOS, sanitizeVideoUrl
+  materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri, RELIABLE_MODE_VIDEOS, sanitizeVideoUrl, forceSyncToSupabase
 } from '../lib/materiService'
 import { currentUser, isAdmin, logoutUser } from '../lib/authService'
 import { uploadVideo, uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
@@ -212,6 +212,22 @@ const handleSave = async () => {
 const handleDelete = async (id, title) => {
   if (confirm(`Hapus materi "${title}"?\nData tidak dapat dikembalikan.`)) {
     await deleteMateri(id)
+  }
+}
+
+const isSyncing = ref(false)
+const handleForceSync = async () => {
+  if (!confirm('Sync semua data materi ke Supabase? Ini akan menimpa data lama di Supabase dengan data terkini (termasuk video yang sudah diupload).')) return
+  isSyncing.value = true
+  try {
+    const result = await forceSyncToSupabase()
+    if (result.success) {
+      alert(`✅ Berhasil sync ${result.count} materi ke Supabase! Semua device sekarang bisa melihat video terbaru.`)
+    } else {
+      alert(`❌ Sync gagal: ${result.error}`)
+    }
+  } finally {
+    isSyncing.value = false
   }
 }
 
@@ -1306,6 +1322,14 @@ const navItems = [
               </div>
               <button @click="resetMateri" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer transition shrink-0">
                 <RefreshCw class="w-3.5 h-3.5" /> Reset
+              </button>
+              <button
+                @click="handleForceSync"
+                :disabled="isSyncing"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-blue-200 text-xs font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer transition shrink-0 disabled:opacity-50"
+              >
+                <CloudUpload class="w-3.5 h-3.5" />
+                {{ isSyncing ? 'Menyinkron...' : 'Sync ke Supabase' }}
               </button>
             </div>
 
