@@ -233,7 +233,7 @@ const doUpload = async (file, modeKey) => {
   try {
     const rawId = currentForm.value.id || currentForm.value.title || 'new_materi'
     const cleanSlug = rawId.toString().toLowerCase().replace(/[^a-z0-9]/g, '_')
-    const customPublicId = `inkluvia_${cleanSlug}_${modeKey}`
+    const customPublicId = `inkluvia_${cleanSlug}_${modeKey}_${Date.now()}`
     const res = await uploadVideo(file, (pct) => { uploadProgress.value = pct }, customPublicId)
     currentForm.value[field].videoUrl = res.secure_url
   } catch (err) {
@@ -265,7 +265,7 @@ const handleImageUpload = async (file) => {
   try {
     const rawId = currentForm.value.id || currentForm.value.title || 'thumb'
     const cleanSlug = rawId.toString().toLowerCase().replace(/[^a-z0-9]/g, '_')
-    const customPublicId = `thumb_${cleanSlug}`
+    const customPublicId = `thumb_${cleanSlug}_${Date.now()}`
     const res = await uploadImage(file, (pct) => { imageUploadProgress.value = pct }, customPublicId)
     currentForm.value.image = res.secure_url
   } catch (err) {

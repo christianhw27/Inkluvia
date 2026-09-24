@@ -55,8 +55,6 @@ export function uploadVideo(file, onProgress = () => {}, customPublicId = '') {
     formData.append('upload_preset', uploadPreset)
     if (customPublicId) {
       formData.append('public_id', customPublicId)
-      formData.append('overwrite', 'true')
-      formData.append('invalidate', 'true')
     }
 
     // Event listener untuk progress upload
@@ -137,8 +135,6 @@ export function uploadImage(file, onProgress = () => {}, customPublicId = '') {
     formData.append('upload_preset', uploadPreset)
     if (customPublicId) {
       formData.append('public_id', customPublicId)
-      formData.append('overwrite', 'true')
-      formData.append('invalidate', 'true')
     }
 
     xhr.upload.addEventListener('progress', (event) => {

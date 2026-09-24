@@ -313,33 +313,34 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
       
       <!-- LEFT SIDEBAR: Navigasi Tab, Poin Belajar & Asesmen (4 Kolom) -->
       <div class="lg:col-span-4 space-y-4">
-        
-        <!-- Tombol Navigasi Video di Bagian Atas Sidebar -->
-        <button
-          @click="activeRightView = 'video'"
-          :class="[
-            'w-full py-3.5 px-5 rounded-3xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-between shadow-sm cursor-pointer border',
-            activeRightView === 'video'
-              ? 'bg-[#0F3261] text-white border-[#0F3261] ring-2 ring-[#0F3261]/20'
-              : 'bg-white text-slate-700 border-slate-200 hover:border-[#3587CE] hover:text-[#3587CE]'
-          ]"
-        >
-          <div class="flex items-center gap-2.5">
-            <Video class="w-4 h-4 text-[#3587CE]" />
-            <span>Video Pembelajaran</span>
-          </div>
-          <span
-            :class="[
-              'text-[10px] px-2.5 py-0.5 rounded-full font-bold',
-              activeRightView === 'video' ? 'bg-blue-500/30 text-blue-100' : 'bg-slate-100 text-slate-500'
-            ]"
-          >
-            {{ activeRightView === 'video' ? 'Sedang Dibuka' : 'Buka Video' }}
-          </span>
-        </button>
 
         <!-- Card 1: Poin Belajar & Mode Aktif -->
         <div class="bg-white rounded-3xl p-5 border border-slate-100/90 shadow-sm space-y-4">
+          <!-- Tombol Navigasi Video -->
+          <button
+            type="button"
+            @click="activeRightView = 'video'"
+            :class="[
+              'w-full py-3 px-4 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-between shadow-sm cursor-pointer border',
+              activeRightView === 'video'
+                ? 'bg-[#0F3261] text-white border-[#0F3261] ring-2 ring-[#0F3261]/20'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#3587CE] hover:text-[#3587CE] hover:bg-blue-50/50'
+            ]"
+          >
+            <div class="flex items-center gap-2.5">
+              <Video class="w-4 h-4 text-[#3587CE]" />
+              <span>Video Pembelajaran</span>
+            </div>
+            <span
+              :class="[
+                'text-[10px] px-2.5 py-1 rounded-lg font-bold',
+                activeRightView === 'video' ? 'bg-blue-500/30 text-blue-100' : 'bg-white border border-slate-200 text-slate-500'
+              ]"
+            >
+              {{ activeRightView === 'video' ? 'Sedang Dibuka' : 'Buka Video' }}
+            </span>
+          </button>
+
           <div>
             <h3 class="text-sm font-bold text-[#0F3261] flex items-center gap-2">
               <Sparkles class="w-4 h-4 text-[#FF7315]" />
