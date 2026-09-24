@@ -599,6 +599,7 @@ export async function resetMateri() {
 /**
  * Force-sync semua materi di memori (localStorage) ke Supabase via upsert.
  * Panggil ini dari Admin Dashboard setelah upload video agar data dipastikan masuk Supabase.
+ * Jika ada kolom yang tidak ada di schema, otomatis retry dengan field minimal saja.
  */
 export async function forceSyncToSupabase() {
   if (!isSupabaseConfigured) return { success: false, error: 'Supabase tidak dikonfigurasi' }
@@ -606,8 +607,30 @@ export async function forceSyncToSupabase() {
     const rows = materiList.value.map(toSupabaseRow)
     const { error } = await supabase.from('materi').upsert(rows, { onConflict: 'id' })
     if (error) {
-      console.warn('Force sync warning:', error.message)
-      return { success: false, error: error.message }
+      // Coba fallback dengan field minimal (tanpa kolom opsional yang mungkin belum ada)
+      console.warn('Full sync failed, trying minimal fields:', error.message)
+      const minimalRows = materiList.value.map(item => ({
+        id: item.id,
+        title: item.title,
+        jenjang: item.jenjang,
+        mata_pelajaran: item.mataPelajaran,
+        level: item.level,
+        badge: item.badge,
+        image: item.image,
+        description: item.description,
+        duration: item.duration,
+        standard_content: item.standardContent,
+        slow_content: item.slowContent,
+        high_contrast_content: item.highContrastContent,
+        focus_content: item.focusContent,
+        created_at: item.created_at || new Date().toISOString()
+      }))
+      const { error: err2 } = await supabase.from('materi').upsert(minimalRows, { onConflict: 'id' })
+      if (err2) {
+        return { success: false, error: `${err2.message}\n\n⚠️ Jalankan SQL berikut di Supabase SQL Editor dulu:\nALTER TABLE public.materi ADD COLUMN IF NOT EXISTS assessment JSONB, ADD COLUMN IF NOT EXISTS learning_points JSONB, ADD COLUMN IF NOT EXISTS types JSONB, ADD COLUMN IF NOT EXISTS standard_content JSONB, ADD COLUMN IF NOT EXISTS slow_content JSONB, ADD COLUMN IF NOT EXISTS high_contrast_content JSONB, ADD COLUMN IF NOT EXISTS focus_content JSONB;` }
+      }
+      console.log(`[Inkluvia] ✅ Minimal sync ${minimalRows.length} materi berhasil (beberapa kolom dilewati)`)
+      return { success: true, count: minimalRows.length, partial: true }
     }
     console.log(`[Inkluvia] ✅ Force sync ${rows.length} materi ke Supabase berhasil`)
     return { success: true, count: rows.length }
