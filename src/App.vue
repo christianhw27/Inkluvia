@@ -31,10 +31,11 @@ import {
   Check,
   Brain,
   Menu,
-  X,
   Star,
   Edit3,
-  MessageSquareHeart
+  MessageSquareHeart,
+  ChevronLeft,
+  ChevronRight
 } from '@lucide/vue'
 import MateriView from './components/MateriView.vue'
 import MateriDetailView from './components/MateriDetailView.vue'
@@ -180,10 +181,66 @@ const openSettings = (tab = 'profile') => {
   navigateTo('settings')
 }
 
-// Dynamic Website Reviews State
+// Dynamic Website Reviews State & Carousel (Max 6 reviews per slide)
 const displayReviews = ref(getAllDisplayReviews())
 const refreshDisplayReviews = () => {
   displayReviews.value = getAllDisplayReviews()
+}
+
+const currentReviewPage = ref(0)
+const REVIEWS_PER_PAGE = 6
+
+const reviewPages = computed(() => {
+  const pages = []
+  const list = displayReviews.value || []
+  for (let i = 0; i < list.length; i += REVIEWS_PER_PAGE) {
+    pages.push(list.slice(i, i + REVIEWS_PER_PAGE))
+  }
+  return pages.length ? pages : [[]]
+})
+
+const totalReviewPages = computed(() => reviewPages.value.length)
+
+const nextReviewPage = () => {
+  if (currentReviewPage.value < totalReviewPages.value - 1) {
+    currentReviewPage.value++
+  } else {
+    currentReviewPage.value = 0 // loop to first
+  }
+}
+
+const prevReviewPage = () => {
+  if (currentReviewPage.value > 0) {
+    currentReviewPage.value--
+  } else {
+    currentReviewPage.value = totalReviewPages.value - 1 // loop to last
+  }
+}
+
+const goToReviewPage = (idx) => {
+  currentReviewPage.value = idx
+}
+
+// Touch swipe gestures for mobile & tablet
+let reviewTouchStartX = 0
+let reviewTouchEndX = 0
+const handleReviewTouchStart = (e) => {
+  if (e.touches && e.touches[0]) {
+    reviewTouchStartX = e.touches[0].screenX
+  }
+}
+const handleReviewTouchEnd = (e) => {
+  if (e.changedTouches && e.changedTouches[0]) {
+    reviewTouchEndX = e.changedTouches[0].screenX
+    const diff = reviewTouchStartX - reviewTouchEndX
+    if (Math.abs(diff) > 45) {
+      if (diff > 0) {
+        nextReviewPage()
+      } else {
+        prevReviewPage()
+      }
+    }
+  }
 }
 
 // Pending navigation state (intended destination saved when intercepted by middleware)
@@ -1539,64 +1596,153 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
         <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
           
-          <!-- Section Header -->
-          <div class="text-center max-w-3xl mx-auto space-y-3">
-            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-100 text-[#E1529C] text-xs font-extrabold tracking-wide uppercase">
-              CERITA MEREKA
-            </span>
-            <h2 class="text-2xl sm:text-4xl font-extrabold text-[#0F3261] tracking-tight">
-              Dipercaya oleh Pengajar dan Keluarga di Seluruh Indonesia
-            </h2>
-          </div>
+          <!-- Section Header with Carousel Navigation -->
+          <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="text-center md:text-left space-y-2">
+              <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-100 text-[#E1529C] text-xs font-extrabold tracking-wide uppercase">
+                CERITA MEREKA
+              </span>
+              <h2 class="text-2xl sm:text-4xl font-extrabold text-[#0F3261] tracking-tight">
+                Dipercaya oleh Pengajar dan Keluarga di Seluruh Indonesia
+              </h2>
+            </div>
 
-          <!-- Dynamic Testimonials Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div
-              v-for="item in displayReviews"
-              :key="item.id"
-              class="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative hover:shadow-md transition-all duration-200 group"
-            >
-              <!-- Badge if it's the current user's review -->
-              <div
-                v-if="currentUser && (item.userId === currentUser.id || item.userEmail === currentUser.email)"
-                class="absolute top-5 right-5 flex items-center gap-1.5"
-              >
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-[#FF7315] border border-orange-200">
-                  Ulasan Kamu
-                </span>
+            <!-- Carousel Header Controls (Visible when more than 6 reviews) -->
+            <div v-if="totalReviewPages > 1" class="flex items-center gap-3 shrink-0">
+              <span class="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-2xs">
+                Slide {{ currentReviewPage + 1 }} dari {{ totalReviewPages }}
+              </span>
+
+              <div class="flex items-center gap-1.5">
                 <button
                   type="button"
-                  @click="openSettings('review')"
-                  title="Ubah ulasan Anda di profil"
-                  class="p-1 rounded-lg text-slate-400 hover:text-[#FF7315] hover:bg-orange-50 transition cursor-pointer"
+                  @click="prevReviewPage"
+                  title="Lihat ulasan sebelumnya"
+                  class="w-9 h-9 rounded-full bg-white hover:bg-[#3DA5FF] text-slate-700 hover:text-white border border-slate-200 hover:border-[#3DA5FF] flex items-center justify-center transition shadow-2xs cursor-pointer active:scale-95"
                 >
-                  <Edit3 class="w-3.5 h-3.5" />
+                  <ChevronLeft class="w-4 h-4" />
                 </button>
-              </div>
-
-              <div class="space-y-4">
-                <div class="text-amber-400 text-base tracking-wider flex items-center gap-0.5">
-                  <span v-for="star in (item.rating || 5)" :key="star">⭐</span>
-                </div>
-                <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed italic">
-                  "{{ item.comment }}"
-                </p>
-              </div>
-
-              <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 text-lg flex items-center justify-center shadow-inner shrink-0">
-                  {{ item.userAvatar || '👧' }}
-                </div>
-                <div class="text-left min-w-0">
-                  <h4 class="text-xs font-extrabold text-[#0F3261] truncate">{{ item.userName }}</h4>
-                  <p class="text-[11px] font-medium text-slate-400 truncate">{{ item.userRole }}</p>
-                </div>
+                <button
+                  type="button"
+                  @click="nextReviewPage"
+                  title="Lihat ulasan berikutnya"
+                  class="w-9 h-9 rounded-full bg-white hover:bg-[#3DA5FF] text-slate-700 hover:text-white border border-slate-200 hover:border-[#3DA5FF] flex items-center justify-center transition shadow-2xs cursor-pointer active:scale-95"
+                >
+                  <ChevronRight class="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
 
+          <!-- Dynamic Sliding Carousel Container -->
+          <div
+            class="relative overflow-hidden w-full select-none"
+            @touchstart="handleReviewTouchStart"
+            @touchend="handleReviewTouchEnd"
+          >
+            <!-- Sliding Track -->
+            <div
+              class="flex transition-transform duration-500 ease-out"
+              :style="{ transform: `translateX(-${currentReviewPage * 100}%)` }"
+            >
+              <!-- Slide Page (Up to 6 reviews per slide) -->
+              <div
+                v-for="(page, pIdx) in reviewPages"
+                :key="pIdx"
+                class="w-full shrink-0 px-0.5"
+              >
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div
+                    v-for="item in page"
+                    :key="item.id"
+                    class="bg-white rounded-3xl p-7 sm:p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative hover:shadow-md hover:border-blue-200 transition-all duration-200 group"
+                  >
+                    <!-- Badge if it's the current user's review -->
+                    <div
+                      v-if="currentUser && (item.userId === currentUser.id || item.userEmail === currentUser.email)"
+                      class="absolute top-5 right-5 flex items-center gap-1.5"
+                    >
+                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-[#FF7315] border border-orange-200">
+                        Ulasan Kamu
+                      </span>
+                      <button
+                        type="button"
+                        @click="openSettings('review')"
+                        title="Ubah ulasan Anda di profil"
+                        class="p-1 rounded-lg text-slate-400 hover:text-[#FF7315] hover:bg-orange-50 transition cursor-pointer"
+                      >
+                        <Edit3 class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="text-amber-400 text-base tracking-wider flex items-center gap-0.5">
+                        <span v-for="star in (item.rating || 5)" :key="star">⭐</span>
+                      </div>
+                      <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed italic">
+                        "{{ item.comment }}"
+                      </p>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 text-lg flex items-center justify-center shadow-inner shrink-0">
+                        {{ item.userAvatar || '👧' }}
+                      </div>
+                      <div class="text-left min-w-0">
+                        <h4 class="text-xs font-extrabold text-[#0F3261] truncate">{{ item.userName }}</h4>
+                        <p class="text-[11px] font-medium text-slate-400 truncate">{{ item.userRole }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating Navigation Arrows for Desktop -->
+            <button
+              v-if="totalReviewPages > 1"
+              type="button"
+              @click="prevReviewPage"
+              title="Lihat ulasan sebelumnya"
+              class="hidden lg:flex absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 text-[#0F3261] items-center justify-center hover:bg-[#3DA5FF] hover:text-white transition-all cursor-pointer z-20 group hover:scale-110 active:scale-95"
+            >
+              <ChevronLeft class="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+            <button
+              v-if="totalReviewPages > 1"
+              type="button"
+              @click="nextReviewPage"
+              title="Lihat ulasan berikutnya"
+              class="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 text-[#0F3261] items-center justify-center hover:bg-[#3DA5FF] hover:text-white transition-all cursor-pointer z-20 group hover:scale-110 active:scale-95"
+            >
+              <ChevronRight class="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+
+          <!-- Bottom Slide Dots & Summary Counter -->
+          <div v-if="totalReviewPages > 1" class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <div class="flex items-center gap-2">
+              <button
+                v-for="pIdx in totalReviewPages"
+                :key="pIdx"
+                type="button"
+                @click="goToReviewPage(pIdx - 1)"
+                :class="[
+                  'h-2.5 rounded-full transition-all duration-300 cursor-pointer',
+                  currentReviewPage === (pIdx - 1)
+                    ? 'w-8 bg-[#FF7315] shadow-xs'
+                    : 'w-2.5 bg-slate-300 hover:bg-slate-400'
+                ]"
+                :title="`Buka slide ${pIdx}`"
+              ></button>
+            </div>
+            <span class="text-xs font-bold text-slate-400">
+              Menampilkan {{ currentReviewPage * REVIEWS_PER_PAGE + 1 }}–{{ Math.min((currentReviewPage + 1) * REVIEWS_PER_PAGE, displayReviews.length) }} dari {{ displayReviews.length }} ulasan
+            </span>
+          </div>
+
           <!-- Bottom Action Box: Encourage User Review -->
-          <div class="mt-8 p-6 rounded-3xl bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="mt-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3.5 text-center sm:text-left">
               <div class="w-12 h-12 rounded-2xl bg-white border border-blue-100 text-amber-500 flex items-center justify-center text-xl shadow-xs shrink-0 mx-auto sm:mx-0">
                 <MessageSquareHeart class="w-6 h-6 text-[#FF7315]" />

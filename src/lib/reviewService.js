@@ -32,6 +32,51 @@ export const BASELINE_REVIEWS = [
     rating: 5,
     comment: 'Pilihan warna kontras yang lembut serta navigasi minim distraksi membuat platform ini aman direkomendasikan untuk anak-anak dengan spektrum perhatian terbatas.',
     isBaseline: true
+  },
+  {
+    id: 'base-4',
+    userName: 'Hendra K.',
+    userRole: 'Orang Tua Anak Disleksia',
+    userAvatar: '👨‍💻',
+    rating: 5,
+    comment: 'Fitur font OpenDyslexic dan pembesaran teks sangat berdampak nyata! Anak saya sekarang tidak cepat lelah saat membaca kalimat panjang di modul IPA.',
+    isBaseline: true
+  },
+  {
+    id: 'base-5',
+    userName: 'Siti Aisyah, S.Pd.',
+    userRole: 'Guru Pendamping Khusus (GPK)',
+    userAvatar: '🧕',
+    rating: 5,
+    comment: 'Platform inklusif terbaik yang pernah kami gunakan di kelas. Narasi audionya jernih dengan ritme santai, anak berkebutuhan khusus merasa sangat dihargai.',
+    isBaseline: true
+  },
+  {
+    id: 'base-6',
+    userName: 'dr. Farhan Alamsyah',
+    userRole: 'Pemerhati Tumbuh Kembang Anak',
+    userAvatar: '🩺',
+    rating: 5,
+    comment: 'Desain sensori Inkluvia sangat tepat: tidak ada kilatan animasi berlebih, warna pastel menenangkan, dan gamifikasinya memotivasi tanpa memicu kecemasan.',
+    isBaseline: true
+  },
+  {
+    id: 'base-7',
+    userName: 'Maya Safitri',
+    userRole: 'Ibu Homeschooling',
+    userAvatar: '🎨',
+    rating: 5,
+    comment: 'Mode Focus Mandiri sangat membantu si kecil saat belajar berhitung. Dia tidak terdistraksi tombol-tombol yang tidak perlu.',
+    isBaseline: true
+  },
+  {
+    id: 'base-8',
+    userName: 'Rian & Ibu',
+    userRole: 'Siswa Kelas 4 SD & Pendamping',
+    userAvatar: '👦',
+    rating: 5,
+    comment: 'Aku suka karakter Si Es Batu! Kuisnya seru dan ada papan skor, jadi semangat pecahkan rekor sendiri bareng mama.',
+    isBaseline: true
   }
 ]
 
