@@ -1384,29 +1384,29 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </div>
             </div>
 
-            <!-- 2. Mode Slow (Warm Amber Theme) -->
+            <!-- 2. Mode Slow (Pink Theme — design.md Bright: #FF74BC, Deep: #E1529C) -->
             <div
               @click="chosenMode = 'slow'; handleStartAdventure(); playButtonPop()"
-              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-amber-400 shadow-xs hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#FF74BC] shadow-xs hover:shadow-xl hover:shadow-[#FF74BC]/15 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
             >
               <!-- Subtle Top Accent Hover Glow -->
-              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#FFDC58] to-[#FF7315] opacity-80 group-hover:opacity-100 transition-opacity"></div>
+              <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#FF74BC] to-[#E1529C] opacity-80 group-hover:opacity-100 transition-opacity"></div>
 
               <div>
                 <!-- Header: Icon + Title + Theme Badge -->
                 <div class="flex items-center justify-between gap-4 mb-4">
                   <div class="flex items-center gap-3.5">
-                    <div class="w-13 h-13 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                    <div class="w-13 h-13 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
                       🐢
                     </div>
                     <div>
-                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#FF7315] transition-colors">
+                      <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#E1529C] transition-colors">
                         2. Slow
                       </h3>
                       <p class="text-xs text-slate-400 font-medium">Tempo Terukur & Artikulasi Bertahap</p>
                     </div>
                   </div>
-                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0">
+                  <span class="text-[11px] font-black px-3 py-1 rounded-full bg-pink-50 text-[#E1529C] border border-pink-200/80 shrink-0">
                     Tempo Terukur
                   </span>
                 </div>
@@ -1418,10 +1418,10 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <!-- Key Feature Tags -->
                 <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-amber-50 group-hover:text-amber-800 transition-colors">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors">
                     ⏱️ Artikulasi Bertahap
                   </span>
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-amber-50 group-hover:text-amber-800 transition-colors">
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors">
                     ⏸️ Jeda Retensi Nyaman
                   </span>
                 </div>
@@ -1433,7 +1433,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
                   <span class="ml-1.5 text-slate-600 font-medium">Disabilitas intelektual & atensi</span>
                 </div>
-                <span class="font-black text-[#FF7315] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                <span class="font-black text-[#E1529C] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                   <span>Coba</span>
                   <ArrowRight class="w-3.5 h-3.5" />
                 </span>
@@ -1995,9 +1995,9 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       <div class="absolute -bottom-24 -left-24 w-80 h-80 rounded-full pointer-events-none opacity-15" style="background: radial-gradient(circle, #FF74BC 0%, transparent 70%);"></div>
       
       <!-- Subtle Footer Doodle SVG Ornaments -->
-      <DoodleOrnament type="star" class="absolute top-12 left-1/3 w-8 h-8 text-[#FFDC58]/25 pointer-events-none hidden md:block" />
-      <DoodleOrnament type="burst" class="absolute bottom-16 right-16 w-10 h-10 text-[#74DC2E]/25 pointer-events-none hidden lg:block" />
-      <DoodleOrnament type="squiggly" class="absolute top-8 right-1/4 w-12 h-6 text-[#FF74BC]/25 pointer-events-none hidden sm:block" />
+      <DoodleOrnament name="star-outline" :size="32" color="#FFDC58" class="absolute top-12 left-1/3 opacity-30 pointer-events-none hidden md:block" />
+      <DoodleOrnament name="burst" :size="40" color="#74DC2E" class="absolute bottom-16 right-16 opacity-30 pointer-events-none hidden lg:block" />
+      <DoodleOrnament name="squiggle" :size="48" color="#FF74BC" class="absolute top-8 right-1/4 opacity-30 pointer-events-none hidden sm:block" />
 
       <div class="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-12 lg:py-16">
         

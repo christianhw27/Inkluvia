@@ -39,6 +39,29 @@ body {
   overflow-x: hidden;
 }
 
+/* Enforce Poppins as primary typeface across all elements (design.md 04) */
+html,
+body,
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: 'Poppins', var(--font-sans);
+}
+
+/* Heading: Bold / SemiBold (design.md 04) */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Bodycopy: Regular / Medium (design.md 04) */
+p, span, li, label, a {
+  font-family: 'Poppins', var(--font-sans);
+}
+
 /* ============================================================
    CUSTOM ANIMATIONS
    ============================================================ */
@@ -91,8 +114,9 @@ body {
 .animate-pulse-subtle { animation: pulse-subtle 3s ease-in-out infinite; }
 
 /* ============================================================
-   TACTILE 3D BUTTON UTILITIES (DUOLINGO-STYLE SATISFYING CLICK)
+   TACTILE 3D BUTTON UTILITIES (Inkluvia Brand System — design.md)
    ============================================================ */
+/* Orange Brand CTA */
 .btn-tactile-orange {
   background: #FF7315;
   color: #FFFFFF;
@@ -110,21 +134,76 @@ body {
   box-shadow: 0 1px 0 #C45307, 0 2px 6px rgba(255, 115, 21, 0.2);
 }
 
+/* Blue Pair (Bright: #3DA5FF, Deep: #3587CE) */
 .btn-tactile-blue {
   background: #3DA5FF;
   color: #FFFFFF;
   border-radius: 9999px;
-  box-shadow: 0 5px 0 #287AC5, 0 8px 16px rgba(61, 165, 255, 0.25);
+  box-shadow: 0 5px 0 #3587CE, 0 8px 16px rgba(61, 165, 255, 0.25);
   transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .btn-tactile-blue:hover {
   transform: translateY(-2px);
-  box-shadow: 0 7px 0 #287AC5, 0 12px 20px rgba(61, 165, 255, 0.35);
+  box-shadow: 0 7px 0 #3587CE, 0 12px 20px rgba(61, 165, 255, 0.35);
   background: #50B0FF;
 }
 .btn-tactile-blue:active {
   transform: translateY(4px);
-  box-shadow: 0 1px 0 #287AC5, 0 2px 6px rgba(61, 165, 255, 0.2);
+  box-shadow: 0 1px 0 #3587CE, 0 2px 6px rgba(61, 165, 255, 0.2);
+}
+
+/* Pink Pair (Bright: #FF74BC, Deep: #E1529C) */
+.btn-tactile-pink {
+  background: #FF74BC;
+  color: #FFFFFF;
+  border-radius: 9999px;
+  box-shadow: 0 5px 0 #E1529C, 0 8px 16px rgba(255, 116, 188, 0.25);
+  transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn-tactile-pink:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 #E1529C, 0 12px 20px rgba(255, 116, 188, 0.35);
+  background: #ff87c5;
+}
+.btn-tactile-pink:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #E1529C, 0 2px 6px rgba(255, 116, 188, 0.2);
+}
+
+/* Green Pair (Bright: #74DC2E, Deep: #54AA1B) */
+.btn-tactile-green {
+  background: #74DC2E;
+  color: #FFFFFF;
+  border-radius: 9999px;
+  box-shadow: 0 5px 0 #54AA1B, 0 8px 16px rgba(116, 220, 46, 0.25);
+  transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn-tactile-green:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 #54AA1B, 0 12px 20px rgba(116, 220, 46, 0.35);
+  background: #84e442;
+}
+.btn-tactile-green:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #54AA1B, 0 2px 6px rgba(116, 220, 46, 0.2);
+}
+
+/* Yellow Pair (Bright: #FFDC58, Deep: #D9BA40) */
+.btn-tactile-yellow {
+  background: #FFDC58;
+  color: #0F3261;
+  border-radius: 9999px;
+  box-shadow: 0 5px 0 #D9BA40, 0 8px 16px rgba(255, 220, 88, 0.3);
+  transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn-tactile-yellow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 #D9BA40, 0 12px 20px rgba(255, 220, 88, 0.4);
+  background: #ffe274;
+}
+.btn-tactile-yellow:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #D9BA40, 0 2px 6px rgba(255, 220, 88, 0.2);
 }
 
 .btn-tactile-white {
