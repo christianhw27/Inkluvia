@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ArrowLeft, ArrowRight, Check } from '@lucide/vue'
 import DoodleOrnament from './DoodleOrnament.vue'
 
@@ -17,6 +17,10 @@ const activeMode = ref('standard') // 'standard' | 'focus'
 const handleContinue = () => {
   emit('selectMode', activeMode.value)
 }
+
+onMounted(() => {
+  window.scrollTo({ top: 0, behavior: 'instant' })
+})
 </script>
 
 <template>

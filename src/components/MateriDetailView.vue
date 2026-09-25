@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted } from 'vue'
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +19,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['back', 'start'])
+
+onMounted(() => {
+  window.scrollTo({ top: 0, behavior: 'instant' })
+})
 </script>
 
 <template>

@@ -377,6 +377,7 @@ const navigateTo = (tab) => {
 }
 
 // Flow Handlers protected by Middleware
+// Flow Handlers protected by Middleware
 const handleOpenDetail = (item) => {
   const targetItem = item || materiList.value[0]
   const guard = canAccessRoute('mode-select')
@@ -387,6 +388,7 @@ const handleOpenDetail = (item) => {
   }
   activeMateriItem.value = targetItem
   currentNav.value = 'mode-select'
+  window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
 const handleStartAdventure = () => {
@@ -397,6 +399,7 @@ const handleStartAdventure = () => {
     return
   }
   currentNav.value = 'mode-select'
+  window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
 const handleModeSelected = (mode) => {
@@ -408,12 +411,19 @@ const handleModeSelected = (mode) => {
   }
   chosenMode.value = mode
   currentNav.value = 'learning-player'
+  window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
 const handlePreviewFromAdmin = (item) => {
   activeMateriItem.value = item
   currentNav.value = 'materi-detail'
+  window.scrollTo({ top: 0, behavior: 'instant' })
 }
+
+// Selalu reset scroll ke posisi paling atas setiap kali berpindah halaman/rute
+watch(currentNav, () => {
+  window.scrollTo({ top: 0, behavior: 'instant' })
+})
 
 // Active Middleware Guard Watcher: jika session habis atau route berubah tanpa izin
 watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
