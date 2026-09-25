@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   XCircle,
   Play,
@@ -1229,7 +1230,7 @@ onMounted(async () => {
 
             <!-- Review Bottom Navigation Actions -->
             <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 flex-wrap">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
                   @click="resetQuiz"
@@ -1245,6 +1246,14 @@ onMounted(async () => {
                 >
                   <Video class="w-4 h-4 text-[#3587CE]" />
                   Kembali ke Video
+                </button>
+                <button
+                  type="button"
+                  @click="emit('finish'); playButtonPop()"
+                  class="px-5 py-3 rounded-2xl bg-[#0F3261] hover:bg-[#18447d] text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <BookOpen class="w-4 h-4 text-amber-300" />
+                  Kembali ke Materi
                 </button>
               </div>
 
@@ -1277,7 +1286,7 @@ onMounted(async () => {
                   <Trophy class="w-4 h-4 text-amber-600" /> Papan Peringkat Materi
                 </span>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <button
                     v-if="quizFinished"
                     type="button"
@@ -1293,6 +1302,15 @@ onMounted(async () => {
                   >
                     <Video class="w-4 h-4 text-[#3587CE]" />
                     Kembali ke Video
+                  </button>
+                  <button
+                    type="button"
+                    @click="emit('finish'); playButtonPop()"
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0F3261] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-200/80"
+                    title="Kembali ke Katalog Materi"
+                  >
+                    <BookOpen class="w-4 h-4 text-[#FF7315]" />
+                    Kembali ke Materi
                   </button>
                 </div>
               </div>
@@ -1382,6 +1400,14 @@ onMounted(async () => {
               >
                 <Video class="w-4 h-4 text-[#3587CE]" />
                 Kembali ke Video
+              </button>
+              <button
+                type="button"
+                @click="emit('finish'); playButtonPop()"
+                class="px-5 py-3.5 rounded-2xl bg-[#0F3261] hover:bg-[#18447d] text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+              >
+                <BookOpen class="w-4 h-4 text-amber-300" />
+                Kembali ke Materi
               </button>
             </div>
           </div>
@@ -1555,6 +1581,14 @@ onMounted(async () => {
                   >
                     <Video class="w-4 h-4 text-[#3587CE]" />
                     Kembali ke Video
+                  </button>
+                  <button
+                    type="button"
+                    @click="emit('finish'); playButtonPop()"
+                    class="px-5 py-3 rounded-2xl bg-white hover:bg-slate-100 text-[#0F3261] border border-slate-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer hover:border-[#0F3261]/40"
+                  >
+                    <BookOpen class="w-4 h-4 text-[#FF7315]" />
+                    Kembali ke Materi
                   </button>
                 </div>
 
