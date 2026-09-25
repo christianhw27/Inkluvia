@@ -69,6 +69,7 @@ const showSubtitles = ref(true)
 
 // Assessment & Quiz State
 const isVideoCompleted = ref(false)
+const showVideoRequiredModal = ref(false)
 const selectedAnswers = ref({})
 const quizFinished = ref(false)
 const quizUserScore = ref(0)
@@ -146,8 +147,27 @@ const handleVideoEnded = () => {
   isVideoCompleted.value = true
 }
 
+const handleLockedQuizClick = () => {
+  playButtonPop()
+  showVideoRequiredModal.value = true
+}
+
+const goToVideoFromModal = () => {
+  playButtonPop()
+  showVideoRequiredModal.value = false
+  activeRightView.value = 'video'
+  if (videoRef.value && videoRef.value.paused) {
+    videoRef.value.play().then(() => {
+      isPlaying.value = true
+    }).catch(() => {})
+  }
+}
+
 const openQuiz = () => {
-  if (!isVideoCompleted.value) return
+  if (!isVideoCompleted.value) {
+    handleLockedQuizClick()
+    return
+  }
   playButtonPop()
   activeRightView.value = 'assessment'
   if (!quizFinished.value && quizSeconds.value === 0) {
@@ -180,6 +200,10 @@ const openLeaderboard = async () => {
 }
 
 const resetQuiz = () => {
+  if (!isVideoCompleted.value) {
+    handleLockedQuizClick()
+    return
+  }
   playButtonPop()
   selectedAnswers.value = {}
   quizFinished.value = false
@@ -1334,12 +1358,22 @@ onMounted(async () => {
             </div>
             <div class="pt-2 flex items-center justify-center gap-3 flex-wrap">
               <button
+                v-if="isVideoCompleted"
                 type="button"
                 @click="openQuiz"
                 class="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#FF7315] to-amber-500 hover:from-[#E86105] hover:to-amber-600 text-white text-xs sm:text-sm font-extrabold transition shadow-md shadow-orange-500/25 flex items-center gap-2 cursor-pointer active:scale-95"
               >
                 <CheckCircle2 class="w-4 h-4" />
                 Mulai Kerjakan Kuis Sekarang
+              </button>
+              <button
+                v-else
+                type="button"
+                @click="handleLockedQuizClick"
+                class="px-6 py-3.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs sm:text-sm font-extrabold transition shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Lock class="w-4 h-4 text-amber-600" />
+                Tonton Video untuk Membuka Kuis
               </button>
               <button
                 type="button"
@@ -1496,12 +1530,23 @@ onMounted(async () => {
               <div class="p-6 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
                 <div class="flex items-center gap-3">
                   <button
+                    v-if="isVideoCompleted"
                     type="button"
                     @click="resetQuiz"
                     class="px-5 py-3 rounded-2xl bg-[#0F3261] hover:bg-[#18447d] text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
                   >
                     <RotateCcw class="w-4 h-4 text-white/80" />
                     Coba Lagi Pecahkan Rekor
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    @click="handleLockedQuizClick"
+                    class="px-5 py-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
+                    title="Selesaikan video pembelajaran terlebih dahulu untuk membuka kuis"
+                  >
+                    <Lock class="w-4 h-4 text-amber-600" />
+                    Tonton Video untuk Pecahkan Rekor
                   </button>
                   <button
                     type="button"
@@ -1532,4 +1577,71 @@ onMounted(async () => {
     </div>
   </div>
 </div>
+
+    <!-- MODAL POPUP: PERINGATAN VIDEO HARUS SELESAI DITONTON -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="showVideoRequiredModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          @click.self="showVideoRequiredModal = false"
+        >
+          <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Icon Video + Lock Badge -->
+            <div class="w-20 h-20 rounded-3xl bg-amber-50 text-amber-600 border-2 border-amber-200 flex items-center justify-center mx-auto text-3xl shadow-inner relative">
+              <Video class="w-10 h-10 text-amber-600" />
+              <div class="absolute -top-1.5 -right-1.5 w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md">
+                <Lock class="w-3.5 h-3.5" />
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <span class="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+                🔒 Kuis Masih Terkunci
+              </span>
+              <h3 class="text-xl font-black text-[#0F3261]">
+                Tonton Video Dulu, Yuk!
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Kamu harus menyelesaikan video pembelajaran materi ini terlebih dahulu sebelum dapat mengerjakan kuis asesmen ataupun mencoba memecahkan rekor di leaderboard.
+              </p>
+            </div>
+
+            <!-- Hint Box -->
+            <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 text-left flex items-start gap-2.5">
+              <span class="text-base shrink-0">💡</span>
+              <span class="leading-relaxed">
+                Menonton video sampai selesai akan membuka gembok kuis dan leaderboard secara otomatis!
+              </span>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                @click="showVideoRequiredModal = false"
+                class="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+              >
+                Nanti Saja
+              </button>
+              <button
+                type="button"
+                @click="goToVideoFromModal"
+                class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF7315] to-orange-500 hover:from-[#E86105] hover:to-orange-600 text-white font-extrabold text-xs shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+              >
+                <Video class="w-4 h-4" />
+                Tonton Video Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 </template>
