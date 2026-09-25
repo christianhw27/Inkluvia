@@ -4,83 +4,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 const REVIEWS_STORAGE_KEY = 'inkluvia_user_site_reviews_v1'
 const SUPABASE_SYSTEM_ROW_ID = 'site-feedback-reviews'
 
-// Baseline ulasan nyata awal yang tampil di landing page
-export const BASELINE_REVIEWS = [
-  {
-    id: 'base-1',
-    userName: 'Bu Ratna',
-    userRole: 'Guru Kelas Inklusi SD',
-    userAvatar: '👩‍🏫',
-    rating: 5,
-    comment: 'Materi visual Inkluvia sangat membantu murid-murid saya yang butuh waktu adaptasi lebih lama. Mereka jadi lebih fokus karena ritme belajarnya tenang dan tidak menuntut.',
-    isBaseline: true
-  },
-  {
-    id: 'base-2',
-    userName: 'Dimas P.',
-    userRole: 'Orang Tua Murid Usia 6 Tahun',
-    userAvatar: '👨‍👦',
-    rating: 5,
-    comment: 'Anak saya sering frustrasi saat belajar membaca di buku biasa. Lewat narasi suara dan karakter es batu di Inkluvia, dia justru berinisiatif belajar sendiri tiap sore.',
-    isBaseline: true
-  },
-  {
-    id: 'base-3',
-    userName: 'Nadia S., M.Psi.',
-    userRole: 'Praktisi Perkembangan Anak',
-    userAvatar: '👩‍⚕️',
-    rating: 5,
-    comment: 'Pilihan warna kontras yang lembut serta navigasi minim distraksi membuat platform ini aman direkomendasikan untuk anak-anak dengan spektrum perhatian terbatas.',
-    isBaseline: true
-  },
-  {
-    id: 'base-4',
-    userName: 'Hendra K.',
-    userRole: 'Orang Tua Anak Disleksia',
-    userAvatar: '👨‍💻',
-    rating: 5,
-    comment: 'Fitur font OpenDyslexic dan pembesaran teks sangat berdampak nyata! Anak saya sekarang tidak cepat lelah saat membaca kalimat panjang di modul IPA.',
-    isBaseline: true
-  },
-  {
-    id: 'base-5',
-    userName: 'Siti Aisyah, S.Pd.',
-    userRole: 'Guru Pendamping Khusus (GPK)',
-    userAvatar: '🧕',
-    rating: 5,
-    comment: 'Platform inklusif terbaik yang pernah kami gunakan di kelas. Narasi audionya jernih dengan ritme santai, anak berkebutuhan khusus merasa sangat dihargai.',
-    isBaseline: true
-  },
-  {
-    id: 'base-6',
-    userName: 'dr. Farhan Alamsyah',
-    userRole: 'Pemerhati Tumbuh Kembang Anak',
-    userAvatar: '🩺',
-    rating: 5,
-    comment: 'Desain sensori Inkluvia sangat tepat: tidak ada kilatan animasi berlebih, warna pastel menenangkan, dan gamifikasinya memotivasi tanpa memicu kecemasan.',
-    isBaseline: true
-  },
-  {
-    id: 'base-7',
-    userName: 'Maya Safitri',
-    userRole: 'Ibu Homeschooling',
-    userAvatar: '🎨',
-    rating: 5,
-    comment: 'Mode Focus Mandiri sangat membantu si kecil saat belajar berhitung. Dia tidak terdistraksi tombol-tombol yang tidak perlu.',
-    isBaseline: true
-  },
-  {
-    id: 'base-8',
-    userName: 'Rian & Ibu',
-    userRole: 'Siswa Kelas 4 SD & Pendamping',
-    userAvatar: '👦',
-    rating: 5,
-    comment: 'Aku suka karakter Si Es Batu! Kuisnya seru dan ada papan skor, jadi semangat pecahkan rekor sendiri bareng mama.',
-    isBaseline: true
-  }
-]
-
-// State reaktif daftar ulasan pengguna
+// State reaktif daftar ulasan pengguna (Murni organik dari database Supabase)
 export const userReviewsList = ref(loadCachedUserReviews())
 
 /**
@@ -111,12 +35,10 @@ function saveCachedUserReviews(reviews) {
 }
 
 /**
- * Mengambil gabungan seluruh ulasan untuk ditampilkan di Landing Page:
- * Ulasan pengguna nyata diletakkan di depan (paling baru), disusul oleh ulasan baseline pendukung.
+ * Mengambil seluruh ulasan organik dari pengguna di database
  */
 export function getAllDisplayReviews() {
-  const custom = userReviewsList.value || []
-  return [...custom, ...BASELINE_REVIEWS]
+  return userReviewsList.value || []
 }
 
 /**

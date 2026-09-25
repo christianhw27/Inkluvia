@@ -1634,8 +1634,44 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </div>
           </div>
 
-          <!-- Dynamic Sliding Carousel Container -->
+          <!-- Empty State (Jika belum ada ulasan sama sekali di database) -->
           <div
+            v-if="displayReviews.length === 0"
+            class="bg-white rounded-3xl p-10 sm:p-14 border border-blue-100 text-center max-w-xl mx-auto shadow-sm space-y-4"
+          >
+            <div class="w-16 h-16 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-3xl mx-auto shadow-inner">
+              <MessageSquareHeart class="w-8 h-8 text-[#FF7315]" />
+            </div>
+            <div class="space-y-1.5">
+              <h3 class="text-lg font-black text-[#0F3261]">Belum Ada Ulasan Publik</h3>
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-md mx-auto">
+                Jadilah orang pertama yang membagikan pengalaman belajar atau ulasan Anda tentang platform Inkluvia!
+              </p>
+            </div>
+            <div class="pt-2">
+              <button
+                v-if="isAuthenticated"
+                type="button"
+                @click="openSettings('review')"
+                class="px-6 py-3 rounded-2xl bg-[#FF7315] hover:bg-[#e86105] text-white text-xs font-black shadow-md hover:shadow-lg transition cursor-pointer inline-flex items-center gap-2"
+              >
+                <Star class="w-4 h-4 fill-white text-white" />
+                <span>Tulis Ulasan Pertama Anda</span>
+              </button>
+              <button
+                v-else
+                type="button"
+                @click="navigateToAuth('login', 'Masuk untuk memberikan ulasan pertama di Inkluvia!')"
+                class="px-6 py-3 rounded-2xl bg-[#3DA5FF] hover:bg-[#3587CE] text-white text-xs font-black shadow-md hover:shadow-lg transition cursor-pointer inline-flex items-center gap-2"
+              >
+                <span>Masuk untuk Memberi Ulasan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Sliding Carousel Container (Ulasan Murni Organik dari Database) -->
+          <div
+            v-else
             class="relative overflow-hidden w-full select-none"
             @touchstart="handleReviewTouchStart"
             @touchend="handleReviewTouchEnd"
