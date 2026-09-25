@@ -529,27 +529,6 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <!-- Right: Audio FX Toggle + Search + Auth Desktop + Mobile Hamburger -->
         <div class="flex items-center gap-2.5 sm:gap-3 flex-1 justify-end max-w-md">
           
-          <!-- Sound Effects Toggle Button -->
-          <button
-            @click="toggleSound(); playButtonPop()"
-            :title="isSoundEnabled ? 'Efek Suara Aktif (klik untuk matikan)' : 'Efek Suara Nonaktif (klik untuk aktifkan)'"
-            class="w-9 h-9 rounded-full bg-slate-100/90 hover:bg-blue-50 text-slate-500 hover:text-[#3587CE] border border-slate-200/80 flex items-center justify-center transition cursor-pointer shrink-0"
-          >
-            <Volume2 v-if="isSoundEnabled" class="w-4 h-4 text-[#3587CE]" />
-            <VolumeX v-else class="w-4 h-4 text-slate-400" />
-          </button>
-
-          <!-- Search Input -->
-          <div class="relative flex-1 max-w-[210px] hidden sm:block">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Cari materi..."
-              class="w-full bg-slate-100/80 hover:bg-white focus:bg-white text-xs lg:text-sm pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:border-[#3DA5FF] focus:outline-none focus:ring-2 focus:ring-[#3DA5FF]/20 transition placeholder:text-slate-400 text-slate-700"
-            />
-          </div>
-
           <!-- NOT LOGGED IN DESKTOP -->
           <div v-if="!isAuthenticated" class="hidden sm:flex items-center gap-2 shrink-0">
             <button
@@ -567,32 +546,36 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </button>
           </div>
 
-          <!-- LOGGED IN DESKTOP (Profile Pill) -->
-          <div v-else class="hidden sm:flex items-center gap-2 shrink-0">
+          <!-- LOGGED IN DESKTOP: Dynamic Circle Avatar that Expands to Oval on Hover -->
+          <div v-else class="hidden sm:flex items-center shrink-0">
             <button
               @click="openSettings('profile')"
-              class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-100/90 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all duration-200 cursor-pointer group shadow-2xs"
+              title="Buka Pengaturan Akun & Profil"
+              class="group relative flex items-center h-11 rounded-full bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all duration-300 ease-out cursor-pointer shadow-2xs hover:shadow-md p-1 overflow-hidden"
             >
-              <div class="relative w-8 h-8 rounded-full flex items-center justify-center text-base bg-white border border-blue-200 shadow-2xs group-hover:scale-105 transition-transform">
+              <!-- Avatar Circle (Selalu tampak lingkaran) -->
+              <div class="relative w-9 h-9 rounded-full flex items-center justify-center text-lg bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-2xs shrink-0 select-none group-hover:scale-105 transition-transform duration-300">
                 <span class="select-none leading-none">{{ currentUser?.avatar || '👧' }}</span>
                 <span
                   class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
                   :class="isAdmin ? 'bg-[#FF7315]' : 'bg-emerald-500'"
                 ></span>
               </div>
-              <div class="flex flex-col text-left pr-1">
+
+              <!-- Collapsible Info Container: Tersembunyi saat normal, mekar jadi oval saat di-hover -->
+              <div class="flex flex-col text-left max-w-0 opacity-0 group-hover:max-w-[240px] group-hover:opacity-100 group-hover:pl-2.5 group-hover:pr-2.5 transition-all duration-300 ease-out overflow-hidden whitespace-nowrap select-none">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-black text-[#0F3261] leading-tight max-w-[90px] truncate">
-                    {{ currentUser?.name || 'Siswa' }}
+                  <span class="text-xs font-black text-[#0F3261] leading-tight truncate">
+                    {{ currentUser?.name || 'Pengguna Inkluvia' }}
                   </span>
                   <span
                     v-if="currentUser?.isPro || isAdmin"
-                    class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs"
+                    class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs shrink-0"
                   >
                     👑 PRO
                   </span>
                 </div>
-                <span class="text-[10px] font-bold text-slate-400 leading-none">
+                <span class="text-[10px] font-bold text-slate-400 leading-tight mt-0.5">
                   {{ isAdmin ? 'Admin' : (currentUser?.isPro ? 'Member PRO' : 'Akun Saya') }}
                 </span>
               </div>
