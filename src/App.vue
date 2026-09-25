@@ -22,6 +22,7 @@ import {
   Clock,
   ShieldCheck,
   BookOpen,
+  Mail,
   Award,
   Heart,
   Smile,
@@ -2048,11 +2049,11 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           </div>
         </div>
 
-        <!-- Main Footer Links Grid (4 Columns) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 text-left">
+        <!-- Main Footer Links Grid (Balanced 12-column layout) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 text-left">
           
-          <!-- Column 1: Brand Info & Values -->
-          <div class="lg:col-span-2 space-y-4">
+          <!-- Column 1: Brand Info & Values (4 cols) -->
+          <div class="lg:col-span-4 space-y-4">
             <div class="flex items-center gap-3">
               <div class="p-2 bg-white rounded-2xl shadow-sm">
                 <img src="/Logo.png" alt="Logo Inkluvia" class="h-8 w-auto" />
@@ -2063,26 +2064,26 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </div>
             </div>
             
-            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md font-normal">
-              Platform media edukasi adaptif dan interaktif yang dibangun khusus untuk memberikan kesetaraan belajar bagi anak-anak Indonesia, termasuk anak berkebutuhan khusus (ABK).
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-sm font-normal">
+              Platform media edukasi adaptif dan interaktif yang dibangun khusus untuk memberikan kesetaraan belajar bagi seluruh anak Indonesia, termasuk anak berkebutuhan khusus (ABK).
             </p>
             
             <!-- Value Badges -->
             <div class="flex items-center gap-2 flex-wrap pt-1">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#3DA5FF]/20 text-[#3DA5FF] border border-[#3DA5FF]/30">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#3DA5FF]/15 text-[#3DA5FF] border border-[#3DA5FF]/30">
                 ⭐ Adaptif
               </span>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#FF74BC]/20 text-[#FF74BC] border border-[#FF74BC]/30">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#FF74BC]/15 text-[#FF74BC] border border-[#FF74BC]/30">
                 💖 Inklusif
               </span>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#74DC2E]/20 text-[#74DC2E] border border-[#74DC2E]/30">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#74DC2E]/15 text-[#74DC2E] border border-[#74DC2E]/30">
                 🌿 Ramah Sensorik
               </span>
             </div>
           </div>
 
-          <!-- Column 2: Navigasi Cepat -->
-          <div class="space-y-3">
+          <!-- Column 2: Navigasi Cepat (2 cols) -->
+          <div class="lg:col-span-2 space-y-3.5">
             <h3 class="text-xs font-black text-amber-400 uppercase tracking-widest">Navigasi</h3>
             <ul class="space-y-2.5 text-xs sm:text-sm text-slate-300 font-medium">
               <li>
@@ -2092,12 +2093,12 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </li>
               <li>
                 <button @click="navigateTo('materi')" class="hover:text-[#3DA5FF] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
-                  <ArrowRight class="w-3 h-3 text-[#3DA5FF]" /> Jelajahi Materi (SD, SMP, SMA)
+                  <ArrowRight class="w-3 h-3 text-[#3DA5FF]" /> Jelajahi Materi
                 </button>
               </li>
               <li>
                 <button @click="navigateTo('harga')" class="hover:text-[#FF7315] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
-                  <ArrowRight class="w-3 h-3 text-[#FF7315]" /> Paket Langganan & Harga
+                  <ArrowRight class="w-3 h-3 text-[#FF7315]" /> Paket & Harga
                 </button>
               </li>
               <li v-if="isAuthenticated">
@@ -2107,68 +2108,83 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </li>
               <li v-if="isAuthenticated">
                 <button @click="openSettings('review')" class="hover:text-amber-400 hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
-                  <ArrowRight class="w-3 h-3 text-amber-400" /> Tulis / Ubah Ulasan Website
+                  <ArrowRight class="w-3 h-3 text-amber-400" /> Ulasan Website
                 </button>
               </li>
               <li v-if="isAdmin">
                 <button @click="navigateTo('admin')" class="hover:text-orange-400 hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold text-orange-400">
-                  <ArrowRight class="w-3 h-3 text-orange-400" /> CMS Admin Inkluvia
+                  <ArrowRight class="w-3 h-3 text-orange-400" /> CMS Admin
                 </button>
               </li>
             </ul>
           </div>
 
-          <!-- Column 3: 4 Mode Belajar Inkluvia -->
-          <div class="space-y-3">
+          <!-- Column 3: 4 Mode Belajar Inkluvia (3 cols) -->
+          <div class="lg:col-span-3 space-y-3.5">
             <h3 class="text-xs font-black text-emerald-400 uppercase tracking-widest">4 Mode Belajar</h3>
-            <ul class="space-y-2.5 text-xs sm:text-sm text-slate-300 font-medium">
-              <li class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#0F3261] ring-2 ring-[#3587CE]"></span>
-                <span class="font-bold text-white">Standar:</span>
-                <span class="text-slate-400 text-xs">Audio Visual Dinamis</span>
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#3DA5FF] ring-2 ring-blue-300"></span>
-                <span class="font-bold text-white">Slow:</span>
-                <span class="text-slate-400 text-xs">Artikulasi Bertahap</span>
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200"></span>
-                <span class="font-bold text-white">Kontras Tinggi:</span>
-                <span class="text-slate-400 text-xs">Rasio Kontras Optimal</span>
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#74DC2E] ring-2 ring-emerald-300"></span>
-                <span class="font-bold text-white">Fokus Mandiri:</span>
-                <span class="text-slate-400 text-xs">Minimalis Bebas Distraksi</span>
-              </li>
-            </ul>
+            <div class="space-y-3">
+              <div class="flex items-start gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#3DA5FF] ring-4 ring-[#3DA5FF]/20 mt-1 shrink-0"></span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white">Standar</p>
+                  <p class="text-[11px] text-slate-400 font-medium leading-tight">Audio visual & animasi dinamis</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#FF74BC] ring-4 ring-[#FF74BC]/20 mt-1 shrink-0"></span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white">Slow</p>
+                  <p class="text-[11px] text-slate-400 font-medium leading-tight">Artikulasi bertahap & jeda terukur</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#FFDC58] ring-4 ring-[#FFDC58]/20 mt-1 shrink-0"></span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white">Kontras Tinggi</p>
+                  <p class="text-[11px] text-slate-400 font-medium leading-tight">Rasio kontras visual optimal</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#74DC2E] ring-4 ring-[#74DC2E]/20 mt-1 shrink-0"></span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white">Fokus Mandiri</p>
+                  <p class="text-[11px] text-slate-400 font-medium leading-tight">Minimalis & bebas distraksi</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Column 4: Dukungan & Komunitas -->
-          <div class="space-y-3">
-            <h3 class="text-xs font-black text-pink-400 uppercase tracking-widest">Dukungan & Komunitas</h3>
-            <p class="text-xs text-slate-300 leading-relaxed">
-              Punya pertanyaan seputar kurikulum inklusif atau membutuhkan demo untuk sekolah?
+          <!-- Column 4: Dukungan & Kontak (3 cols) -->
+          <div class="lg:col-span-3 space-y-3.5">
+            <h3 class="text-xs font-black text-pink-400 uppercase tracking-widest">Dukungan & Kontak</h3>
+            <p class="text-xs text-slate-300 leading-relaxed font-normal">
+              Punya pertanyaan seputar kurikulum inklusif atau butuh demo untuk sekolah?
             </p>
-            <div class="space-y-2 pt-1 text-xs text-slate-300">
-              <div class="flex items-center gap-2">
-                <span class="text-[#3DA5FF] font-bold">📧 Email:</span>
-                <a href="mailto:halo@inkluvia.id" class="hover:text-white underline">halo@inkluvia.id</a>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[#74DC2E] font-bold">⏰ Layanan:</span>
-                <span>Senin - Jumat (08.00 - 17.00 WIB)</span>
+            <div class="space-y-2.5 pt-1 text-xs">
+              <a href="mailto:halo@inkluvia.id" class="flex items-center gap-2.5 text-slate-300 hover:text-white transition group">
+                <div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0 group-hover:bg-[#3DA5FF]/20 group-hover:text-[#3DA5FF] transition">
+                  <Mail class="w-3.5 h-3.5" />
+                </div>
+                <span class="font-medium text-slate-200">halo@inkluvia.id</span>
+              </a>
+              <div class="flex items-center gap-2.5 text-slate-300">
+                <div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-[#74DC2E]">
+                  <Clock class="w-3.5 h-3.5" />
+                </div>
+                <div class="text-[11px] leading-tight">
+                  <span class="font-semibold text-slate-200">Senin - Jumat</span>
+                  <span class="text-slate-400 ml-1.5">(08.00 - 17.00 WIB)</span>
+                </div>
               </div>
             </div>
 
             <!-- Social Links / Community Pills -->
-            <div class="flex items-center gap-2.5 pt-2">
+            <div class="flex items-center gap-2 pt-2 flex-wrap">
               <a
                 href="#"
                 @click.prevent
-                title="Komunitas Edukasi WhatsApp"
-                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#74DC2E] hover:text-slate-900 text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+                title="Komunitas WhatsApp"
+                class="px-3 py-1.5 rounded-xl bg-white/08 hover:bg-[#74DC2E]/20 text-slate-300 hover:text-[#74DC2E] border border-white/10 hover:border-[#74DC2E]/30 text-xs font-bold transition flex items-center gap-1.5"
               >
                 <span>WhatsApp</span>
               </a>
@@ -2176,7 +2192,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 href="#"
                 @click.prevent
                 title="Instagram Resmi Inkluvia"
-                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#FF74BC] hover:text-white text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+                class="px-3 py-1.5 rounded-xl bg-white/08 hover:bg-[#FF74BC]/20 text-slate-300 hover:text-[#FF74BC] border border-white/10 hover:border-[#FF74BC]/30 text-xs font-bold transition flex items-center gap-1.5"
               >
                 <span>Instagram</span>
               </a>
@@ -2184,7 +2200,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 href="#"
                 @click.prevent
                 title="YouTube Edukasi Inkluvia"
-                class="px-3 py-1 rounded-full bg-white/10 hover:bg-[#FF7315] hover:text-white text-white flex items-center gap-1.5 transition cursor-pointer text-xs font-bold"
+                class="px-3 py-1.5 rounded-xl bg-white/08 hover:bg-[#FF7315]/20 text-slate-300 hover:text-[#FF7315] border border-white/10 hover:border-[#FF7315]/30 text-xs font-bold transition flex items-center gap-1.5"
               >
                 <span>YouTube</span>
               </a>
