@@ -31,7 +31,10 @@ import {
   Check,
   Brain,
   Menu,
-  X
+  X,
+  Star,
+  Edit3,
+  MessageSquareHeart
 } from '@lucide/vue'
 import MateriView from './components/MateriView.vue'
 import MateriDetailView from './components/MateriDetailView.vue'
@@ -42,6 +45,10 @@ import AuthView from './components/AuthView.vue'
 import PricingView from './components/PricingView.vue'
 import SettingsView from './components/SettingsView.vue'
 import DoodleOrnament from './components/DoodleOrnament.vue'
+import {
+  getAllDisplayReviews,
+  fetchSiteReviewsFromSupabase
+} from './lib/reviewService.js'
 import { materiList, selectedMateri, isLoadingMateri } from './lib/materiService'
 import {
   currentUser,
@@ -173,6 +180,12 @@ const openSettings = (tab = 'profile') => {
   navigateTo('settings')
 }
 
+// Dynamic Website Reviews State
+const displayReviews = ref(getAllDisplayReviews())
+const refreshDisplayReviews = () => {
+  displayReviews.value = getAllDisplayReviews()
+}
+
 // Pending navigation state (intended destination saved when intercepted by middleware)
 const intendedNav = ref(null)
 
@@ -274,8 +287,10 @@ const handleWindowScroll = () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('scroll', handleWindowScroll, { passive: true })
+  await fetchSiteReviewsFromSupabase()
+  refreshDisplayReviews()
 })
 
 onUnmounted(() => {
@@ -1534,69 +1549,85 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </h2>
           </div>
 
-          <!-- 3 Testimonial Cards Grid -->
+          <!-- Dynamic Testimonials Grid -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <!-- Testimonial 1 -->
-            <div class="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative">
+            <div
+              v-for="item in displayReviews"
+              :key="item.id"
+              class="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative hover:shadow-md transition-all duration-200 group"
+            >
+              <!-- Badge if it's the current user's review -->
+              <div
+                v-if="currentUser && (item.userId === currentUser.id || item.userEmail === currentUser.email)"
+                class="absolute top-5 right-5 flex items-center gap-1.5"
+              >
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-[#FF7315] border border-orange-200">
+                  Ulasan Kamu
+                </span>
+                <button
+                  type="button"
+                  @click="openSettings('review')"
+                  title="Ubah ulasan Anda di profil"
+                  class="p-1 rounded-lg text-slate-400 hover:text-[#FF7315] hover:bg-orange-50 transition cursor-pointer"
+                >
+                  <Edit3 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
               <div class="space-y-4">
-                <div class="text-amber-400 text-lg">⭐⭐⭐⭐⭐</div>
+                <div class="text-amber-400 text-base tracking-wider flex items-center gap-0.5">
+                  <span v-for="star in (item.rating || 5)" :key="star">⭐</span>
+                </div>
                 <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed italic">
-                  "Materi visual Inkluvia sangat membantu murid-murid saya yang butuh waktu adaptasi lebih lama. Mereka jadi lebih fokus karena ritme belajarnya tenang dan tidak menuntut."
+                  "{{ item.comment }}"
                 </p>
               </div>
 
               <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-blue-100 text-lg flex items-center justify-center shadow-inner">
-                  👩‍🏫
+                <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 text-lg flex items-center justify-center shadow-inner shrink-0">
+                  {{ item.userAvatar || '👧' }}
                 </div>
-                <div class="text-left">
-                  <h4 class="text-xs font-extrabold text-[#0F3261]">Bu Ratna</h4>
-                  <p class="text-[11px] font-medium text-slate-400">Guru Kelas Inklusi SD</p>
+                <div class="text-left min-w-0">
+                  <h4 class="text-xs font-extrabold text-[#0F3261] truncate">{{ item.userName }}</h4>
+                  <p class="text-[11px] font-medium text-slate-400 truncate">{{ item.userRole }}</p>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Testimonial 2 -->
-            <div class="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative">
-              <div class="space-y-4">
-                <div class="text-amber-400 text-lg">⭐⭐⭐⭐⭐</div>
-                <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed italic">
-                  "Anak saya sering frustrasi saat belajar membaca di buku biasa. Lewat narasi suara dan karakter es batu di Inkluvia, dia justru berinisiatif belajar sendiri tiap sore."
+          <!-- Bottom Action Box: Encourage User Review -->
+          <div class="mt-8 p-6 rounded-3xl bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5 text-center sm:text-left">
+              <div class="w-12 h-12 rounded-2xl bg-white border border-blue-100 text-amber-500 flex items-center justify-center text-xl shadow-xs shrink-0 mx-auto sm:mx-0">
+                <MessageSquareHeart class="w-6 h-6 text-[#FF7315]" />
+              </div>
+              <div>
+                <h4 class="text-sm font-extrabold text-[#0F3261]">Punya Pengalaman Belajar Seru di Inkluvia?</h4>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Bagikan ulasan Anda sekarang. Ulasan dapat diedit kapan saja dan langsung tampil di halaman ini!
                 </p>
               </div>
-
-              <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-orange-100 text-lg flex items-center justify-center shadow-inner">
-                  👨‍👦
-                </div>
-                <div class="text-left">
-                  <h4 class="text-xs font-extrabold text-[#0F3261]">Dimas P.</h4>
-                  <p class="text-[11px] font-medium text-slate-400">Orang Tua Murid Usia 6 Tahun</p>
-                </div>
-              </div>
             </div>
 
-            <!-- Testimonial 3 -->
-            <div class="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6 relative">
-              <div class="space-y-4">
-                <div class="text-amber-400 text-lg">⭐⭐⭐⭐⭐</div>
-                <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed italic">
-                  "Pilihan warna kontras yang lembut serta navigasi minim distraksi membuat platform ini aman direkomendasikan untuk anak-anak dengan spektrum perhatian terbatas."
-                </p>
-              </div>
-
-              <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-emerald-100 text-lg flex items-center justify-center shadow-inner">
-                  👩‍⚕️
-                </div>
-                <div class="text-left">
-                  <h4 class="text-xs font-extrabold text-[#0F3261]">Nadia S., M.Psi.</h4>
-                  <p class="text-[11px] font-medium text-slate-400">Praktisi Perkembangan Anak</p>
-                </div>
-              </div>
+            <div class="shrink-0 w-full sm:w-auto">
+              <button
+                v-if="isAuthenticated"
+                type="button"
+                @click="openSettings('review')"
+                class="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#FF7315] hover:bg-[#e86105] text-white text-xs font-black shadow-md hover:shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Star class="w-3.5 h-3.5 fill-white text-white" />
+                <span>Tulis / Ubah Ulasan Saya</span>
+              </button>
+              <button
+                v-else
+                type="button"
+                @click="navigateToAuth('login', 'Masuk ke akun Anda untuk membagikan ulasan di Inkluvia!')"
+                class="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#3DA5FF] hover:bg-[#3587CE] text-white text-xs font-black shadow-md hover:shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Masuk untuk Memberi Ulasan</span>
+              </button>
             </div>
-
           </div>
 
         </div>
@@ -1738,6 +1769,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         @back="navigateTo(previousNav || 'beranda')"
         @navigate="navigateTo"
         @logout="handleLogout"
+        @updated="refreshDisplayReviews"
       />
     </main>
 
@@ -1891,6 +1923,11 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               <li v-if="isAuthenticated">
                 <button @click="openSettings('profile')" class="hover:text-[#74DC2E] hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
                   <ArrowRight class="w-3 h-3 text-[#74DC2E]" /> Pengaturan Akun
+                </button>
+              </li>
+              <li v-if="isAuthenticated">
+                <button @click="openSettings('review')" class="hover:text-amber-400 hover:translate-x-1 transition-all cursor-pointer inline-flex items-center gap-1.5">
+                  <ArrowRight class="w-3 h-3 text-amber-400" /> Tulis / Ubah Ulasan Website
                 </button>
               </li>
               <li v-if="isAdmin">

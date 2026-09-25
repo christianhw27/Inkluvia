@@ -19,8 +19,18 @@ import {
   Coffee,
   Eye,
   Mail,
-  ChevronRight
+  ChevronRight,
+  Star,
+  Trash2,
+  ExternalLink,
+  MessageSquareHeart
 } from '@lucide/vue'
+import {
+  getUserReview,
+  saveUserReview,
+  deleteUserReview,
+  fetchSiteReviewsFromSupabase
+} from '../lib/reviewService.js'
 import DoodleOrnament from './DoodleOrnament.vue'
 
 const props = defineProps({
@@ -147,12 +157,15 @@ watch(currentUser, (user) => {
   if (user) {
     editedName.value = user.name || ''
     selectedAvatar.value = user.avatar || '👧'
+    loadUserReviewState()
   }
 }, { immediate: true })
 
-onMounted(() => {
+onMounted(async () => {
   syncFromStorage()
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  await fetchSiteReviewsFromSupabase()
+  loadUserReviewState()
 })
 
 // Actions: Profile
@@ -253,6 +266,110 @@ const toggleReduceMotion = () => {
 const triggerLogout = () => {
   showLogoutConfirm.value = false
   emit('logout')
+}
+
+// ==================== USER WEBSITE REVIEW STATE & ACTIONS ====================
+const reviewRating = ref(5)
+const reviewRole = ref('Orang Tua Murid')
+const reviewComment = ref('')
+const reviewSaveSuccess = ref(false)
+const reviewSaveError = ref('')
+const isReviewSaving = ref(false)
+const hasExistingReview = ref(false)
+const existingReviewData = ref(null)
+const showDeleteReviewConfirm = ref(false)
+
+const ROLE_SUGGESTIONS = [
+  'Orang Tua Murid',
+  'Guru Kelas Inklusi SD',
+  'Praktisi Perkembangan Anak',
+  'Guru Mata Pelajaran',
+  'Pemerhati Pendidikan Anak',
+  'Siswa / Pelajar'
+]
+
+const loadUserReviewState = () => {
+  const userKey = currentUser.value?.id || currentUser.value?.email
+  if (userKey) {
+    const existing = getUserReview(userKey)
+    if (existing) {
+      existingReviewData.value = existing
+      reviewRating.value = existing.rating || 5
+      reviewRole.value = existing.userRole || ''
+      reviewComment.value = existing.comment || ''
+      hasExistingReview.value = true
+      return
+    }
+  }
+  existingReviewData.value = null
+  reviewRating.value = 5
+  reviewRole.value = currentUser.value?.role === 'admin' ? 'Guru / Pengajar' : 'Orang Tua Murid'
+  reviewComment.value = ''
+  hasExistingReview.value = false
+}
+
+const handleSaveReview = async () => {
+  const userKey = currentUser.value?.id || currentUser.value?.email
+  if (!userKey) {
+    reviewSaveError.value = 'Silakan login terlebih dahulu untuk memberikan ulasan.'
+    return
+  }
+  if (!reviewComment.value.trim()) {
+    reviewSaveError.value = 'Silakan tuliskan pesan ulasan Anda terlebih dahulu.'
+    return
+  }
+
+  isReviewSaving.value = true
+  reviewSaveError.value = ''
+  reviewSaveSuccess.value = false
+
+  try {
+    const res = await saveUserReview({
+      userId: userKey,
+      userEmail: currentUser.value?.email,
+      userName: editedName.value.trim() || currentUser.value?.name || 'Pengguna Inkluvia',
+      userAvatar: selectedAvatar.value || currentUser.value?.avatar || '👧',
+      userRole: reviewRole.value.trim() || 'Orang Tua / Siswa',
+      rating: reviewRating.value,
+      comment: reviewComment.value.trim()
+    })
+
+    if (res.success) {
+      hasExistingReview.value = true
+      existingReviewData.value = res.review
+      reviewSaveSuccess.value = true
+      emit('updated')
+      setTimeout(() => {
+        reviewSaveSuccess.value = false
+      }, 4000)
+    } else {
+      reviewSaveError.value = res.error || 'Gagal menyimpan ulasan.'
+    }
+  } catch (err) {
+    reviewSaveError.value = 'Terjadi kesalahan saat menyimpan ulasan.'
+  } finally {
+    isReviewSaving.value = false
+  }
+}
+
+const handleDeleteReview = async () => {
+  const userKey = currentUser.value?.id || currentUser.value?.email
+  if (!userKey) return
+
+  isReviewSaving.value = true
+  try {
+    await deleteUserReview(userKey)
+    hasExistingReview.value = false
+    existingReviewData.value = null
+    reviewComment.value = ''
+    showDeleteReviewConfirm.value = false
+    reviewSaveSuccess.value = false
+    emit('updated')
+  } catch (err) {
+    console.error('Gagal menghapus ulasan:', err)
+  } finally {
+    isReviewSaving.value = false
+  }
 }
 </script>
 
@@ -512,7 +629,40 @@ const triggerLogout = () => {
               <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">CMS</span>
             </button>
 
-            <!-- 6. Logout Button -->
+            <!-- 6. Ulasan Website Saya (Tampil di Landing Page) -->
+            <button
+              @click="activeTab = 'review'"
+              :class="[
+                'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm font-bold transition cursor-pointer text-left',
+                activeTab === 'review'
+                  ? 'bg-[#FF7315] text-white shadow-md'
+                  : 'text-slate-700 hover:bg-slate-100/80 hover:text-[#0F3261]'
+              ]"
+            >
+              <div
+                :class="[
+                  'w-8 h-8 rounded-xl flex items-center justify-center transition-colors',
+                  activeTab === 'review' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-600'
+                ]"
+              >
+                <Star class="w-4 h-4 fill-amber-400 text-amber-500" />
+              </div>
+              <span class="flex-1">Ulasan Website</span>
+              <span
+                v-if="hasExistingReview"
+                class="text-[10px] px-2 py-0.5 rounded-full font-black bg-emerald-100 text-emerald-800"
+              >
+                Aktif ⭐
+              </span>
+              <span
+                v-else
+                class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800"
+              >
+                Tulis
+              </span>
+            </button>
+
+            <!-- 7. Logout Button -->
             <button
               @click="showLogoutConfirm = true"
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm font-bold text-rose-600 hover:bg-rose-50 transition cursor-pointer text-left mt-1"
@@ -896,7 +1046,197 @@ const triggerLogout = () => {
             </div>
           </div>
 
+          <!-- TAB 4: ULASAN WEBSITE SAYA (Dinamis & Tampil di Landing Page) -->
+          <div
+            v-else-if="activeTab === 'review'"
+            class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-6 animate-slide-up"
+          >
+            <!-- Tab Header -->
+            <div class="border-b border-slate-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 mb-2">
+                  <Star class="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                  Testimoni Publik Landing Page
+                </span>
+                <h3 class="text-xl font-black text-[#0F3261] flex items-center gap-2">
+                  <span>Ulasan Website Anda untuk Inkluvia</span>
+                </h3>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">
+                  Ulasan yang Anda tulis di sini tersimpan secara aman di database cloud dan akan langsung tampil pada bagian <strong>"Cerita Mereka"</strong> di halaman depan.
+                </p>
+              </div>
 
+              <button
+                type="button"
+                @click="emit('navigate', 'beranda')"
+                class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 self-start cursor-pointer shrink-0"
+              >
+                <ExternalLink class="w-3.5 h-3.5 text-[#3587CE]" />
+                Lihat di Landing Page
+              </button>
+            </div>
+
+            <!-- Success Alert -->
+            <div
+              v-if="reviewSaveSuccess"
+              class="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold animate-slide-up"
+            >
+              <CheckCircle2 class="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>Ulasan berhasil disimpan dan tersinkronisasi ke database cloud! Ulasan Anda kini tampil di halaman depan.</span>
+            </div>
+
+            <!-- Error Alert -->
+            <div
+              v-if="reviewSaveError"
+              class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-semibold"
+            >
+              {{ reviewSaveError }}
+            </div>
+
+            <!-- Live Card Preview (Menampilkan Tampilan Persis Seperti di Landing Page) -->
+            <div class="space-y-2">
+              <label class="block text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                Pratinjau Tampilan di Halaman Depan
+              </label>
+              
+              <div class="bg-gradient-to-br from-amber-50/40 via-orange-50/20 to-slate-50 rounded-3xl p-6 sm:p-7 border-2 border-dashed border-amber-300 relative max-w-lg shadow-xs">
+                <div class="space-y-3">
+                  <!-- Rating Stars -->
+                  <div class="flex items-center justify-between">
+                    <div class="text-amber-400 text-base tracking-widest flex items-center gap-0.5">
+                      <span v-for="star in reviewRating" :key="star">⭐</span>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-[#FF7315] border border-orange-200">
+                      Ulasan Kamu
+                    </span>
+                  </div>
+
+                  <!-- Comment Text Preview -->
+                  <p class="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed italic">
+                    "{{ reviewComment.trim() || 'Tuliskan pengalaman belajar atau kesan Anda terhadap Inkluvia di formulir bawah ini...' }}"
+                  </p>
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-amber-200/60 flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-white border border-amber-200 text-lg flex items-center justify-center shadow-inner shrink-0">
+                    {{ selectedAvatar || currentUser?.avatar || '👧' }}
+                  </div>
+                  <div class="text-left min-w-0">
+                    <h4 class="text-xs font-extrabold text-[#0F3261] truncate">
+                      {{ editedName || currentUser?.name || 'Nama Anda' }}
+                    </h4>
+                    <p class="text-[11px] font-medium text-slate-500 truncate">
+                      {{ reviewRole || 'Orang Tua / Siswa' }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Edit Ulasan -->
+            <form @submit.prevent="handleSaveReview" class="space-y-5 pt-2">
+              
+              <!-- 1. Star Rating Picker -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">
+                  Pilih Penilaian Bintang
+                </label>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button
+                    v-for="r in 5"
+                    :key="r"
+                    type="button"
+                    @click="reviewRating = r"
+                    :class="[
+                      'px-3.5 py-2 rounded-2xl border transition-all flex items-center gap-1.5 cursor-pointer text-xs font-extrabold select-none active:scale-95',
+                      reviewRating === r
+                        ? 'bg-amber-400 text-slate-900 border-amber-500 shadow-sm scale-105'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'
+                    ]"
+                  >
+                    <span>⭐ {{ r }}</span>
+                    <span class="text-[11px] opacity-80 font-normal">
+                      {{ r === 5 ? 'Luar Biasa' : r === 4 ? 'Sangat Baik' : r === 3 ? 'Baik' : r === 2 ? 'Cukup' : 'Kurang' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 2. Peran / Status Anda -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                  Peran / Status Anda (Ditampilkan di Kartu)
+                </label>
+                <input
+                  v-model="reviewRole"
+                  type="text"
+                  placeholder="Contoh: Orang Tua Murid Kelas 4 SD / Guru Inklusi"
+                  class="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-semibold text-slate-800 outline-none transition bg-white"
+                />
+
+                <!-- Quick Role Suggestions -->
+                <div class="flex items-center gap-2 flex-wrap mt-2">
+                  <span class="text-[11px] text-slate-400 font-semibold">Saran:</span>
+                  <button
+                    v-for="sug in ROLE_SUGGESTIONS"
+                    :key="sug"
+                    type="button"
+                    @click="reviewRole = sug"
+                    class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                  >
+                    {{ sug }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- 3. Kolom Ulasan / Testimoni -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Tuliskan Pengalaman / Ulasan Anda
+                  </label>
+                  <span class="text-[11px] font-mono text-slate-400">
+                    {{ reviewComment.length }} / 400 karakter
+                  </span>
+                </div>
+                <textarea
+                  v-model="reviewComment"
+                  maxlength="400"
+                  rows="4"
+                  placeholder="Bagikan bagaimana Inkluvia membantu anak atau murid Anda dalam belajar (misal: materi visualnya mudah dipahami, narasinya tenang, atau fiturnya sangat inklusif)..."
+                  class="w-full p-4 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-medium text-slate-800 outline-none transition bg-white resize-none leading-relaxed"
+                ></textarea>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <button
+                    v-if="hasExistingReview"
+                    type="button"
+                    @click="showDeleteReviewConfirm = true"
+                    class="py-2.5 px-4 rounded-2xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                    <span>Hapus Ulasan Saya</span>
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                  <button
+                    type="submit"
+                    :disabled="isReviewSaving || !reviewComment.trim()"
+                    class="w-full sm:w-auto py-3.5 px-8 rounded-2xl text-white font-extrabold text-sm transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                    style="background: linear-gradient(135deg, #FF7315 0%, #e86105 100%); box-shadow: 0 4px 15px rgba(255,115,21,0.30);"
+                  >
+                    <Sparkles class="w-4 h-4" />
+                    <span>{{ isReviewSaving ? 'Menyimpan ke Database...' : (hasExistingReview ? 'Perbarui Ulasan di Landing Page' : 'Kirim Ulasan ke Landing Page') }}</span>
+                  </button>
+                </div>
+              </div>
+
+            </form>
+          </div>
 
         </main>
       </div>
@@ -936,6 +1276,45 @@ const triggerLogout = () => {
               class="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white transition cursor-pointer shadow-md shadow-rose-200"
             >
               Ya, Keluar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ================= DELETE REVIEW CONFIRMATION MODAL ================= -->
+    <Teleport to="body">
+      <div
+        v-if="showDeleteReviewConfirm"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        @click.self="showDeleteReviewConfirm = false"
+      >
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center animate-slide-up space-y-4">
+          <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl mx-auto">
+            <Trash2 class="w-7 h-7" />
+          </div>
+
+          <div>
+            <h3 class="text-lg font-black text-slate-800">Hapus Ulasan Anda?</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+              Ulasan Anda akan dihapus dari database cloud dan tidak akan tampil lagi di halaman depan Inkluvia. Anda dapat menulis ulasan baru kapan saja.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              @click="showDeleteReviewConfirm = false"
+              class="py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              @click="handleDeleteReview"
+              class="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white transition cursor-pointer shadow-md shadow-rose-200"
+            >
+              Ya, Hapus
             </button>
           </div>
         </div>

@@ -323,11 +323,14 @@ async function loadFromSupabase() {
     if (error) throw error
 
     if (data && data.length > 0) {
-      // Data ada di Supabase — gunakan sebagai sumber utama
-      materiList.value = data.map(row => sanitizeMateriItem(parseSupabaseRow(row)))
+      // Data ada di Supabase — gunakan sebagai sumber utama (filter baris sistem internal)
+      const validMateri = data.filter(
+        row => row.id !== 'site-feedback-reviews' && row.jenjang !== 'SYSTEM'
+      )
+      materiList.value = validMateri.map(row => sanitizeMateriItem(parseSupabaseRow(row)))
       selectedMateri.value = materiList.value[0] || null
       saveToLocalStorage() // Cache ke localStorage
-      console.log(`[Inkluvia] ✅ Loaded ${data.length} materi dari Supabase`)
+      console.log(`[Inkluvia] ✅ Loaded ${validMateri.length} materi dari Supabase`)
       return
     }
 
@@ -423,7 +426,10 @@ function loadFromLocalStorage() {
     if (cached) {
       const parsed = JSON.parse(cached)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        materiList.value = parsed.map(sanitizeMateriItem)
+        const validMateri = parsed.filter(
+          item => item.id !== 'site-feedback-reviews' && item.jenjang !== 'SYSTEM'
+        )
+        materiList.value = validMateri.map(sanitizeMateriItem)
         selectedMateri.value = materiList.value[0]
         return
       }
