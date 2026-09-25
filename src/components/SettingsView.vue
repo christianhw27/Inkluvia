@@ -121,154 +121,7 @@ const dyslexicFont = ref(false)
 const soundEffects = ref(true)
 const reduceMotion = ref(false)
 
-// Sync preferences from storage & user profile
-const syncFromStorage = () => {
-  if (currentUser.value) {
-    editedName.value = currentUser.value.name || ''
-    selectedAvatar.value = currentUser.value.avatar || '👧'
-  }
-
-  // Theme
-  const savedTheme = localStorage.getItem('inkluvia_theme') || 'light'
-  currentTheme.value = savedTheme
-  applyTheme(savedTheme)
-
-  // Font size
-  const savedFontSize = localStorage.getItem('inkluvia_font_size') || 'normal'
-  fontSize.value = savedFontSize
-  applyFontSize(savedFontSize)
-
-  // Dyslexic font
-  const savedDyslexic = localStorage.getItem('inkluvia_dyslexic_font') === 'true'
-  dyslexicFont.value = savedDyslexic
-  applyDyslexicFont(savedDyslexic)
-
-  // Sound effects
-  const savedSound = localStorage.getItem('inkluvia_sound_effects') !== 'false'
-  soundEffects.value = savedSound
-
-  // Reduced motion
-  const savedMotion = localStorage.getItem('inkluvia_reduce_motion') === 'true'
-  reduceMotion.value = savedMotion
-  applyReduceMotion(savedMotion)
-}
-
-watch(currentUser, (user) => {
-  if (user) {
-    editedName.value = user.name || ''
-    selectedAvatar.value = user.avatar || '👧'
-    loadUserReviewState()
-  }
-}, { immediate: true })
-
-onMounted(async () => {
-  syncFromStorage()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-  await fetchSiteReviewsFromSupabase()
-  loadUserReviewState()
-})
-
-// Actions: Profile
-const handleSaveProfile = async () => {
-  profileSaveSuccess.value = false
-  profileSaveError.value = ''
-
-  if (!editedName.value.trim()) {
-    profileSaveError.value = 'Nama lengkap tidak boleh kosong.'
-    return
-  }
-
-  isSaving.value = true
-  try {
-    const updated = await updateUserProfile({
-      name: editedName.value.trim(),
-      avatar: selectedAvatar.value
-    })
-    if (updated) {
-      profileSaveSuccess.value = true
-      emit('updated', updated)
-      setTimeout(() => {
-        profileSaveSuccess.value = false
-      }, 4000)
-    }
-  } catch (e) {
-    profileSaveError.value = 'Gagal menyimpan profil: ' + (e.message || 'Terjadi kesalahan')
-  } finally {
-    isSaving.value = false
-  }
-}
-
-// Action: Theme
-const applyTheme = (themeId) => {
-  const root = document.documentElement
-  root.classList.remove('theme-light', 'theme-soft', 'theme-dark', 'theme-contrast')
-  root.classList.add(`theme-${themeId}`)
-}
-
-const selectTheme = (themeId) => {
-  currentTheme.value = themeId
-  localStorage.setItem('inkluvia_theme', themeId)
-  applyTheme(themeId)
-}
-
-// Action: Font Size
-const applyFontSize = (size) => {
-  const root = document.documentElement
-  root.classList.remove('font-size-lg', 'font-size-xl')
-  if (size === 'lg') root.classList.add('font-size-lg')
-  if (size === 'xl') root.classList.add('font-size-xl')
-}
-
-const selectFontSize = (size) => {
-  fontSize.value = size
-  localStorage.setItem('inkluvia_font_size', size)
-  applyFontSize(size)
-}
-
-// Action: Dyslexic Font
-const applyDyslexicFont = (enabled) => {
-  const root = document.documentElement
-  if (enabled) {
-    root.classList.add('font-dyslexic')
-  } else {
-    root.classList.remove('font-dyslexic')
-  }
-}
-
-const toggleDyslexicFont = () => {
-  dyslexicFont.value = !dyslexicFont.value
-  localStorage.setItem('inkluvia_dyslexic_font', String(dyslexicFont.value))
-  applyDyslexicFont(dyslexicFont.value)
-}
-
-// Action: Sound Effects
-const toggleSoundEffects = () => {
-  soundEffects.value = !soundEffects.value
-  localStorage.setItem('inkluvia_sound_effects', String(soundEffects.value))
-}
-
-// Action: Reduced Motion
-const applyReduceMotion = (enabled) => {
-  const root = document.documentElement
-  if (enabled) {
-    root.classList.add('reduce-motion')
-  } else {
-    root.classList.remove('reduce-motion')
-  }
-}
-
-const toggleReduceMotion = () => {
-  reduceMotion.value = !reduceMotion.value
-  localStorage.setItem('inkluvia_reduce_motion', String(reduceMotion.value))
-  applyReduceMotion(reduceMotion.value)
-}
-
-const triggerLogout = () => {
-  showLogoutConfirm.value = false
-  emit('logout')
-}
-
-// ==================== USER WEBSITE REVIEW STATE & ACTIONS ====================
+// ==================== USER WEBSITE REVIEW STATE ====================
 const reviewRating = ref(5)
 const reviewRole = ref('Orang Tua Murid')
 const reviewComment = ref('')
@@ -288,7 +141,80 @@ const ROLE_SUGGESTIONS = [
   'Siswa / Pelajar'
 ]
 
-const loadUserReviewState = () => {
+// ==================== ACTION FUNCTIONS ====================
+
+// Action: Theme
+function applyTheme(themeId) {
+  const root = document.documentElement
+  root.classList.remove('theme-light', 'theme-soft', 'theme-dark', 'theme-contrast')
+  root.classList.add(`theme-${themeId}`)
+}
+
+function selectTheme(themeId) {
+  currentTheme.value = themeId
+  localStorage.setItem('inkluvia_theme', themeId)
+  applyTheme(themeId)
+}
+
+// Action: Font Size
+function applyFontSize(size) {
+  const root = document.documentElement
+  root.classList.remove('font-size-lg', 'font-size-xl')
+  if (size === 'lg') root.classList.add('font-size-lg')
+  if (size === 'xl') root.classList.add('font-size-xl')
+}
+
+function selectFontSize(size) {
+  fontSize.value = size
+  localStorage.setItem('inkluvia_font_size', size)
+  applyFontSize(size)
+}
+
+// Action: Dyslexic Font
+function applyDyslexicFont(enabled) {
+  const root = document.documentElement
+  if (enabled) {
+    root.classList.add('font-dyslexic')
+  } else {
+    root.classList.remove('font-dyslexic')
+  }
+}
+
+function toggleDyslexicFont() {
+  dyslexicFont.value = !dyslexicFont.value
+  localStorage.setItem('inkluvia_dyslexic_font', String(dyslexicFont.value))
+  applyDyslexicFont(dyslexicFont.value)
+}
+
+// Action: Sound Effects
+function toggleSoundEffects() {
+  soundEffects.value = !soundEffects.value
+  localStorage.setItem('inkluvia_sound_effects', String(soundEffects.value))
+}
+
+// Action: Reduced Motion
+function applyReduceMotion(enabled) {
+  const root = document.documentElement
+  if (enabled) {
+    root.classList.add('reduce-motion')
+  } else {
+    root.classList.remove('reduce-motion')
+  }
+}
+
+function toggleReduceMotion() {
+  reduceMotion.value = !reduceMotion.value
+  localStorage.setItem('inkluvia_reduce_motion', String(reduceMotion.value))
+  applyReduceMotion(reduceMotion.value)
+}
+
+function triggerLogout() {
+  showLogoutConfirm.value = false
+  emit('logout')
+}
+
+// Action: Reviews
+function loadUserReviewState() {
   const userKey = currentUser.value?.id || currentUser.value?.email
   if (userKey) {
     const existing = getUserReview(userKey)
@@ -308,7 +234,7 @@ const loadUserReviewState = () => {
   hasExistingReview.value = false
 }
 
-const handleSaveReview = async () => {
+async function handleSaveReview() {
   const userKey = currentUser.value?.id || currentUser.value?.email
   if (!userKey) {
     reviewSaveError.value = 'Silakan login terlebih dahulu untuk memberikan ulasan.'
@@ -352,7 +278,7 @@ const handleSaveReview = async () => {
   }
 }
 
-const handleDeleteReview = async () => {
+async function handleDeleteReview() {
   const userKey = currentUser.value?.id || currentUser.value?.email
   if (!userKey) return
 
@@ -371,6 +297,84 @@ const handleDeleteReview = async () => {
     isReviewSaving.value = false
   }
 }
+
+// Action: Profile
+async function handleSaveProfile() {
+  profileSaveSuccess.value = false
+  profileSaveError.value = ''
+
+  if (!editedName.value.trim()) {
+    profileSaveError.value = 'Nama lengkap tidak boleh kosong.'
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const updated = await updateUserProfile({
+      name: editedName.value.trim(),
+      avatar: selectedAvatar.value
+    })
+    if (updated) {
+      profileSaveSuccess.value = true
+      emit('updated', updated)
+      setTimeout(() => {
+        profileSaveSuccess.value = false
+      }, 4000)
+    }
+  } catch (e) {
+    profileSaveError.value = 'Gagal menyimpan profil: ' + (e.message || 'Terjadi kesalahan')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+// Sync preferences from storage & user profile
+function syncFromStorage() {
+  if (currentUser.value) {
+    editedName.value = currentUser.value.name || ''
+    selectedAvatar.value = currentUser.value.avatar || '👧'
+  }
+
+  // Theme
+  const savedTheme = localStorage.getItem('inkluvia_theme') || 'light'
+  currentTheme.value = savedTheme
+  applyTheme(savedTheme)
+
+  // Font size
+  const savedFontSize = localStorage.getItem('inkluvia_font_size') || 'normal'
+  fontSize.value = savedFontSize
+  applyFontSize(savedFontSize)
+
+  // Dyslexic font
+  const savedDyslexic = localStorage.getItem('inkluvia_dyslexic_font') === 'true'
+  dyslexicFont.value = savedDyslexic
+  applyDyslexicFont(savedDyslexic)
+
+  // Sound effects
+  const savedSound = localStorage.getItem('inkluvia_sound_effects') !== 'false'
+  soundEffects.value = savedSound
+
+  // Reduced motion
+  const savedMotion = localStorage.getItem('inkluvia_reduce_motion') === 'true'
+  reduceMotion.value = savedMotion
+  applyReduceMotion(savedMotion)
+}
+
+// ==================== WATCHERS & LIFECYCLE ====================
+watch(currentUser, (user) => {
+  if (user) {
+    editedName.value = user.name || ''
+    selectedAvatar.value = user.avatar || '👧'
+    loadUserReviewState()
+  }
+}, { immediate: true })
+
+onMounted(async () => {
+  syncFromStorage()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  await fetchSiteReviewsFromSupabase()
+  loadUserReviewState()
+})
 </script>
 
 <template>
