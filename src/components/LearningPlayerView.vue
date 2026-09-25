@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  XCircle,
   Play,
   Pause,
   RotateCcw,
@@ -17,10 +18,26 @@ import {
   Lock,
   X,
   HelpCircle,
-  Video
+  Video,
+  Trophy,
+  Clock,
+  Award,
+  Medal,
+  ChevronRight,
+  User,
+  Star
 } from '@lucide/vue'
 import { currentUser } from '../lib/authService'
 import { RELIABLE_MODE_VIDEOS, sanitizeVideoUrl } from '../lib/materiService'
+import {
+  formatDuration,
+  getUserMateriHighScore,
+  saveQuizAttempt,
+  getMateriLeaderboard,
+  fetchMateriLeaderboardFromSupabase,
+  submitToMateriLeaderboard
+} from '../lib/quizService'
+import { playMascotChime, playButtonPop } from '../lib/soundEffects'
 
 const props = defineProps({
   materi: {
@@ -38,7 +55,7 @@ const emit = defineEmits(['back', 'finish', 'open-settings'])
 // Active Mode State
 const currentMode = ref(props.initialMode || 'standard')
 
-// Active Right View ('video' | 'assessment')
+// Active Right View ('video' | 'assessment' | 'leaderboard')
 const activeRightView = ref('video')
 
 // Video Player State
@@ -54,32 +71,74 @@ const showSubtitles = ref(true)
 const isVideoCompleted = ref(false)
 const selectedAnswers = ref({})
 const quizFinished = ref(false)
-const quizScore = ref(0)
+const quizUserScore = ref(0)
+const quizCorrectCount = ref(0)
+const quizResultsList = ref([])
+const quizDurationSeconds = ref(0)
+const quizSeconds = ref(0)
+let quizTimerInterval = null
+
+// High Score & Leaderboard State
+const userHighScore = ref(null)
+const isNewRecord = ref(false)
+const userRankInLeaderboard = ref(0)
+const materiLeaderboard = ref([])
 
 const quizQuestions = computed(() => {
   if (props.materi?.assessment?.questions?.length) {
-    return props.materi.assessment.questions
+    return props.materi.assessment.questions.map((q, idx) => ({
+      ...q,
+      points: Number(q.points) || (props.materi.assessment.questions.length <= 2 ? 50 : 25)
+    }))
   }
   return [
     {
       id: 'def-1',
       questionText: `Apa perubahan wujud yang terjadi pada materi "${props.materi?.title || 'ini'}"?`,
+      points: 35,
       options: ['Mencair (Padat ke Cair)', 'Membeku (Cair ke Padat)', 'Menguap (Cair ke Gas)', 'Sublimasi (Padat ke Gas)'],
       correctOptionIndex: 0
     },
     {
       id: 'def-2',
       questionText: 'Apa faktor utama yang menyebabkan es batu dapat mencair?',
+      points: 35,
       options: ['Suhu dingin', 'Suhu panas / energi kalor', 'Angin kencang', 'Cahaya redup'],
       correctOptionIndex: 1
     },
     {
       id: 'def-3',
       questionText: 'Manakah contoh peristiwa mencair dalam kehidupan sehari-hari?',
+      points: 30,
       options: ['Air disimpan di freezer', 'Es krim meleleh di bawah sinar matahari', 'Embun di pagi hari', 'Kapur barus mengecil'],
       correctOptionIndex: 1
     }
   ]
+})
+
+const totalPossibleScore = computed(() => {
+  return quizQuestions.value.reduce((acc, q) => acc + (Number(q.points) || 25), 0)
+})
+
+const startQuizTimer = () => {
+  stopQuizTimer()
+  quizSeconds.value = 0
+  quizTimerInterval = setInterval(() => {
+    if (!quizFinished.value && activeRightView.value === 'assessment') {
+      quizSeconds.value++
+    }
+  }, 1000)
+}
+
+const stopQuizTimer = () => {
+  if (quizTimerInterval) {
+    clearInterval(quizTimerInterval)
+    quizTimerInterval = null
+  }
+}
+
+onUnmounted(() => {
+  stopQuizTimer()
 })
 
 const handleVideoEnded = () => {
@@ -89,25 +148,109 @@ const handleVideoEnded = () => {
 
 const openQuiz = () => {
   if (!isVideoCompleted.value) return
+  playButtonPop()
   activeRightView.value = 'assessment'
+  if (!quizFinished.value && quizSeconds.value === 0) {
+    startQuizTimer()
+  }
+}
+
+const calculateUserRank = () => {
+  const userKey = currentUser.value?.id || currentUser.value?.email || 'guest_user'
+  const studentDisplayName = studentName.value || currentUser.value?.name || 'Siswa Hebat'
+  const idx = materiLeaderboard.value.findIndex(
+    item => (item.userId && item.userId === userKey) || item.userName === studentDisplayName
+  )
+  userRankInLeaderboard.value = idx >= 0 ? idx + 1 : 0
+}
+
+const openLeaderboard = async () => {
+  playButtonPop()
+  activeRightView.value = 'leaderboard'
+  // 1. Tampilkan cache lokal segera (instant response)
+  materiLeaderboard.value = getMateriLeaderboard(props.materi?.id)
+  calculateUserRank()
+
+  // 2. Tarik update terbaru dari Supabase Cloud (sinkron antar-device)
+  const cloudList = await fetchMateriLeaderboardFromSupabase(props.materi?.id)
+  if (cloudList) {
+    materiLeaderboard.value = cloudList
+    calculateUserRank()
+  }
 }
 
 const resetQuiz = () => {
+  playButtonPop()
   selectedAnswers.value = {}
   quizFinished.value = false
-  quizScore.value = 0
+  quizUserScore.value = 0
+  quizCorrectCount.value = 0
+  quizResultsList.value = []
+  activeRightView.value = 'assessment'
+  startQuizTimer()
 }
 
 const submitQuiz = () => {
+  stopQuizTimer()
+  quizDurationSeconds.value = quizSeconds.value
+
+  let earnedPoints = 0
   let correctCount = 0
-  const questions = quizQuestions.value
-  questions.forEach((q, idx) => {
-    if (selectedAnswers.value[idx] === q.correctOptionIndex) {
+  const results = []
+
+  quizQuestions.value.forEach((q, idx) => {
+    const userChoice = selectedAnswers.value[idx]
+    const isCorrect = userChoice === q.correctOptionIndex
+    const points = Number(q.points) || 25
+    if (isCorrect) {
       correctCount++
+      earnedPoints += points
     }
+    results.push({
+      questionId: q.id || idx,
+      questionText: q.questionText,
+      points,
+      userChoiceIndex: userChoice,
+      userChoiceText: q.options[userChoice] || 'Tidak dijawab',
+      isCorrect,
+      pointsEarned: isCorrect ? points : 0
+    })
   })
-  quizScore.value = Math.round((correctCount / questions.length) * 100)
+
+  quizUserScore.value = earnedPoints
+  quizCorrectCount.value = correctCount
+  quizResultsList.value = results
   quizFinished.value = true
+
+  // Simpan Rekor Skor Tertinggi (High Score saja, tidak diakumulasi)
+  const userKey = currentUser.value?.id || currentUser.value?.email || 'guest_user'
+  const studentDisplayName = studentName.value || currentUser.value?.name || 'Siswa Hebat'
+
+  const attemptRes = saveQuizAttempt(userKey, props.materi?.id, {
+    score: earnedPoints,
+    totalPoints: totalPossibleScore.value,
+    timeSeconds: quizDurationSeconds.value,
+    correctCount,
+    totalQuestions: quizQuestions.value.length
+  })
+
+  isNewRecord.value = attemptRes.isNewHighScore
+  userHighScore.value = attemptRes.currentRecord
+
+  // Simpan ke Leaderboard Materi
+  const lbRes = submitToMateriLeaderboard(props.materi?.id, {
+    userId: userKey,
+    userName: studentDisplayName,
+    userAvatar: currentUser.value?.avatar || '👧',
+    score: earnedPoints,
+    totalPoints: totalPossibleScore.value,
+    timeSeconds: quizDurationSeconds.value
+  })
+
+  userRankInLeaderboard.value = lbRes.rank
+  materiLeaderboard.value = lbRes.leaderboard
+
+  playMascotChime()
 }
 
 // Mode change watcher -> set playback rate
@@ -243,6 +386,20 @@ const formatTime = (secs) => {
 }
 
 const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
+
+onMounted(async () => {
+  const userKey = currentUser.value?.id || currentUser.value?.email || 'guest_user'
+  userHighScore.value = getUserMateriHighScore(userKey, props.materi?.id)
+  materiLeaderboard.value = getMateriLeaderboard(props.materi?.id)
+  calculateUserRank()
+
+  // Sinkronisasi data cloud dari Supabase saat player dimuat
+  const cloudList = await fetchMateriLeaderboardFromSupabase(props.materi?.id)
+  if (cloudList) {
+    materiLeaderboard.value = cloudList
+    calculateUserRank()
+  }
+})
 </script>
 
 <template>
@@ -421,32 +578,66 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
             </template>
           </p>
 
-          <!-- Action Button (Satu-satunya tombol asesmen) -->
-          <button
-            @click="activeRightView = 'assessment'"
-            :disabled="!isVideoCompleted"
-            :class="[
-              'w-full py-3 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm',
-              isVideoCompleted
-                ? activeRightView === 'assessment'
-                  ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-400/40 cursor-default'
-                  : 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700 cursor-pointer active:scale-95 shadow-indigo-500/20'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-            ]"
-          >
-            <template v-if="isVideoCompleted">
-              <span v-if="activeRightView === 'assessment'" class="flex items-center gap-1.5">
-                ✍️ Sedang Dikerjakan di Sebelah Kanan
+          <!-- High score indicator if exists -->
+          <div v-if="userHighScore" class="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 space-y-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-extrabold text-amber-900 flex items-center gap-1.5">
+                <Trophy class="w-3.5 h-3.5 text-amber-600" /> Rekor Tertinggi:
               </span>
+              <span class="font-black text-amber-700 bg-white px-2 py-0.5 rounded-md border border-amber-200">
+                {{ userHighScore.score }} / {{ userHighScore.totalPoints || totalPossibleScore }} Poin
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-amber-800/80 font-medium">
+              <span>Waktu Terbaik:</span>
+              <span class="font-mono font-bold">{{ formatDuration(userHighScore.timeSeconds) }}</span>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <div class="space-y-2">
+            <button
+              @click="openQuiz"
+              :disabled="!isVideoCompleted"
+              :class="[
+                'w-full py-3 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm',
+                isVideoCompleted
+                  ? activeRightView === 'assessment'
+                    ? 'bg-indigo-700 text-white font-bold ring-2 ring-indigo-400/40 cursor-default'
+                    : 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700 cursor-pointer active:scale-95 shadow-indigo-500/20'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              ]"
+            >
+              <template v-if="isVideoCompleted">
+                <span v-if="activeRightView === 'assessment' && !quizFinished" class="flex items-center gap-1.5">
+                  ✍️ Sedang Mengerjakan Kuis...
+                </span>
+                <span v-else-if="activeRightView === 'assessment' && quizFinished" class="flex items-center gap-1.5">
+                  📋 Melihat Review Hasil Kuis
+                </span>
+                <span v-else-if="quizFinished" class="flex items-center gap-1.5">
+                  📋 Lihat Evaluasi ({{ quizUserScore }}/{{ totalPossibleScore }} Poin)
+                </span>
+                <span v-else class="flex items-center gap-1.5">
+                  ✍️ Kerjakan Asesmen ({{ quizQuestions.length }} Soal • {{ totalPossibleScore }} Poin)
+                </span>
+              </template>
               <span v-else class="flex items-center gap-1.5">
-                ✍️ Kerjakan Asesmen ({{ quizQuestions.length }} Soal)
+                <Lock class="w-3.5 h-3.5" />
+                Tonton Video Dulu
               </span>
-            </template>
-            <span v-else class="flex items-center gap-1.5">
-              <Lock class="w-3.5 h-3.5" />
-              Tonton Video Dulu
-            </span>
-          </button>
+            </button>
+
+            <!-- Leaderboard shortcut button -->
+            <button
+              type="button"
+              @click="openLeaderboard"
+              class="w-full py-2.5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-amber-200 bg-amber-50/60 hover:bg-amber-100/70 text-amber-800 cursor-pointer"
+            >
+              <Trophy class="w-3.5 h-3.5 text-amber-600" />
+              <span>Lihat Papan Peringkat Materi</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -712,165 +903,626 @@ const studentName = computed(() => currentUser.value?.name || 'Teman Belajar')
           </div>
         </div>
 
-        <!-- VIEW 2: INLINE GOOGLE FORM-STYLE ASSESSMENT (Menggantikan posisi video) -->
+        <!-- VIEW 2: INLINE GOOGLE FORM-STYLE ASSESSMENT & REVIEW JAWABAN -->
         <div v-else-if="activeRightView === 'assessment'" class="space-y-4">
           
-          <!-- Form Header Card (Google Form style top banner) -->
-          <div class="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
-            <div class="h-3.5 bg-gradient-to-r from-[#0F3261] via-[#3587CE] to-indigo-600"></div>
-            <div class="p-6 sm:p-7 space-y-3">
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1.5">
-                  ✍️ Form Asesmen & Kuis Siswa
-                </span>
+          <!-- 1. ACTIVE QUIZ FORM (Saat Kuis Sedang Dikerjakan) -->
+          <div v-if="!quizFinished" class="space-y-4">
+            <!-- Form Header Card (Google Form style top banner) -->
+            <div class="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
+              <div class="h-3.5 bg-gradient-to-r from-[#0F3261] via-[#3587CE] to-indigo-600"></div>
+              <div class="p-6 sm:p-7 space-y-3">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1.5">
+                      ✍️ Asesmen Pemahaman Siswa
+                    </span>
+                    <!-- Live Count-Up Stopwatch -->
+                    <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-1.5 shadow-xs">
+                      <Clock class="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                      Stopwatch: {{ formatDuration(quizSeconds) }}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    @click="activeRightView = 'video'"
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <Video class="w-4 h-4 text-[#3587CE]" />
+                    Kembali ke Video
+                  </button>
+                </div>
+
+                <h2 class="text-xl sm:text-2xl font-black text-[#0F3261]">
+                  {{ materi.assessment?.title || 'Asesmen Pemahaman Materi' }}
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Pilihlah satu jawaban yang paling tepat. Poin dinilai berdasarkan bobot masing-masing butir soal. Waktu pengerjaan dicatat untuk papan peringkat (leaderboard)!
+                </p>
+                
+                <div class="flex items-center gap-4 text-xs font-semibold text-slate-500 pt-3 border-t border-slate-100 flex-wrap">
+                  <span class="flex items-center gap-1">📚 Materi: <strong class="text-slate-800">{{ materi.title }}</strong></span>
+                  <span class="flex items-center gap-1">👤 Siswa: <strong class="text-slate-800">{{ studentName }}</strong></span>
+                  <span class="flex items-center gap-1">📝 Jumlah: <strong class="text-slate-800">{{ quizQuestions.length }} Soal</strong></span>
+                  <span class="flex items-center gap-1 text-indigo-700">🌟 Total Bobot: <strong class="text-indigo-900 font-extrabold">{{ totalPossibleScore }} Poin</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Questions List -->
+            <form @submit.prevent="submitQuiz" class="space-y-4">
+              <div
+                v-for="(q, qIdx) in quizQuestions"
+                :key="q.id || qIdx"
+                class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-sm space-y-4 transition hover:border-indigo-300"
+              >
+                <!-- Question Card Header -->
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg">
+                      Soal {{ qIdx + 1 }} dari {{ quizQuestions.length }}
+                    </span>
+                    <!-- Dynamic Question Point Weight Badge -->
+                    <span class="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1">
+                      <Star class="w-3 h-3 text-amber-500 fill-amber-400" /> Bobot: {{ q.points }} Poin
+                    </span>
+                  </div>
+
+                  <span v-if="selectedAnswers[qIdx] !== undefined" class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md flex items-center gap-1 border border-emerald-200">
+                    <CheckCircle2 class="w-3.5 h-3.5" /> Terjawab
+                  </span>
+                  <span v-else class="text-xs text-rose-500 font-bold">* Wajib diisi</span>
+                </div>
+
+                <!-- Question Text -->
+                <h3 class="text-sm sm:text-base font-bold text-[#0F3261] leading-relaxed">
+                  {{ q.questionText }}
+                </h3>
+
+                <!-- Radio Options A, B, C, D -->
+                <div class="space-y-2.5 pt-1">
+                  <label
+                    v-for="(opt, oIdx) in q.options"
+                    :key="oIdx"
+                    :class="[
+                      'flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer select-none',
+                      selectedAnswers[qIdx] === oIdx
+                        ? 'bg-indigo-50/80 border-indigo-400 text-indigo-950 font-bold shadow-xs ring-1 ring-indigo-400/30'
+                        : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/80 hover:border-slate-300'
+                    ]"
+                  >
+                    <div class="pt-0.5 shrink-0">
+                      <input
+                        type="radio"
+                        :name="`q-${qIdx}`"
+                        :value="oIdx"
+                        v-model="selectedAnswers[qIdx]"
+                        class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                      />
+                    </div>
+                    <div class="text-xs sm:text-sm leading-snug flex-1">
+                      <span class="font-bold mr-1.5 opacity-80">{{ String.fromCharCode(65 + oIdx) }}.</span>
+                      {{ opt }}
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Bottom Action Bar -->
+              <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    @click="activeRightView = 'video'"
+                    class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Batal / Tonton Video
+                  </button>
+                  <span class="text-xs text-slate-500 font-semibold hidden sm:inline">
+                    Terjawab: <strong class="text-indigo-600">{{ Object.keys(selectedAnswers).length }}</strong> / {{ quizQuestions.length }}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-slate-500 font-bold hidden md:inline">
+                    Total Nilai Kuis: <strong class="text-[#0F3261] font-black">{{ totalPossibleScore }} Poin</strong>
+                  </span>
+                  <button
+                    type="submit"
+                    :disabled="Object.keys(selectedAnswers).length < quizQuestions.length"
+                    :class="[
+                      'px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold text-white transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95',
+                      Object.keys(selectedAnswers).length === quizQuestions.length
+                        ? 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 shadow-indigo-500/25'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    ]"
+                  >
+                    <CheckCircle2 class="w-5 h-5" />
+                    Kirim Jawaban Asesmen
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- 2. FITUR REVIEW JAWABAN & RINGKASAN EVALUASI (Setelah Kuis Di-submit) -->
+          <div v-else class="space-y-4">
+            
+            <!-- Header Summary Card -->
+            <div class="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
+              <div class="h-3.5 bg-gradient-to-r from-emerald-500 via-[#3587CE] to-indigo-600"></div>
+              <div class="p-6 sm:p-7 space-y-5">
+                
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1.5">
+                    <CheckCircle2 class="w-3.5 h-3.5 text-emerald-600" /> Ringkasan Evaluasi Kuis
+                  </span>
+
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      @click="openLeaderboard"
+                      class="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Trophy class="w-4 h-4 text-amber-600" />
+                      Papan Peringkat
+                    </button>
+                    <button
+                      type="button"
+                      @click="activeRightView = 'video'"
+                      class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Video class="w-4 h-4 text-[#3587CE]" />
+                      Kembali ke Video
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Score & High Score Record Display Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  <!-- Sesi Ini -->
+                  <div class="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-extrabold uppercase tracking-wide text-indigo-600">Perolehan Sesi Ini</span>
+                      <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                        {{ Math.round((quizUserScore / (totalPossibleScore || 1)) * 100) }}%
+                      </span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-4xl sm:text-5xl font-black text-[#0F3261]">{{ quizUserScore }}</span>
+                      <span class="text-sm font-bold text-slate-400">/ {{ totalPossibleScore }} Poin</span>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs text-slate-600 pt-2 border-t border-indigo-100/70 flex-wrap">
+                      <span class="flex items-center gap-1 font-semibold">
+                        <CheckCircle2 class="w-3.5 h-3.5 text-emerald-600" /> {{ quizCorrectCount }} / {{ quizQuestions.length }} Benar
+                      </span>
+                      <span class="flex items-center gap-1 font-mono font-bold text-slate-700">
+                        <Clock class="w-3.5 h-3.5 text-amber-600" /> Durasi: {{ formatDuration(quizDurationSeconds) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Rekor Skor Tertinggi (High Score) -->
+                  <div class="p-5 sm:p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                          <Trophy class="w-3.5 h-3.5 text-amber-500" /> Rekor Tertinggi Kamu
+                        </span>
+                        <span v-if="isNewRecord" class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-400 text-slate-900 animate-bounce">
+                          ⭐ REKOR BARU!
+                        </span>
+                      </div>
+                      <div class="flex items-baseline gap-2 mt-2">
+                        <span class="text-3xl sm:text-4xl font-black text-amber-600">
+                          {{ userHighScore?.score ?? quizUserScore }}
+                        </span>
+                        <span class="text-xs font-bold text-slate-400">/ {{ totalPossibleScore }} Poin Maksimal</span>
+                      </div>
+                    </div>
+                    <div class="text-[11px] text-slate-500 pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                      <span>Waktu Terbaik: <strong class="text-slate-700 font-mono">{{ formatDuration(userHighScore?.timeSeconds || quizDurationSeconds) }}</strong></span>
+                      <span class="text-emerald-700 font-bold">Tersimpan Permanen</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Banner Informasi Rahasia Kunci Jawaban -->
+                <div class="p-3.5 sm:p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
+                  <div class="text-lg shrink-0 mt-0.5">ℹ️</div>
+                  <div class="space-y-0.5 leading-relaxed">
+                    <p class="font-extrabold">Informasi Evaluasi Mandiri</p>
+                    <p class="text-slate-600">
+                      Halaman ini hanya menampilkan indikator status <strong class="text-emerald-700">Benar</strong> atau <strong class="text-rose-600">Salah</strong> untuk mengukur ketepatan jawabanmu. Kunci jawaban asli dan pembahasan sengaja tidak ditampilkan agar kamu dapat berlatih kembali dan mengasah pemahamanmu secara mandiri.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- List of Questions Status Evaluation (BENAR / SALAH SAJA Tanpa Kunci Asli) -->
+            <div class="space-y-3.5">
+              <div
+                v-for="(res, rIdx) in quizResultsList"
+                :key="res.questionId || rIdx"
+                :class="[
+                  'bg-white rounded-3xl p-6 sm:p-7 border shadow-sm space-y-3.5 transition border-l-8',
+                  res.isCorrect ? 'border-slate-200 border-l-emerald-500' : 'border-slate-200 border-l-rose-500'
+                ]"
+              >
+                <!-- Card Header with Status Badge -->
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
+                      Nomor {{ rIdx + 1 }}
+                    </span>
+                    <span class="text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                      Bobot: {{ res.points }} Poin
+                    </span>
+                  </div>
+
+                  <!-- Status Badge: Benar atau Salah Saja -->
+                  <div v-if="res.isCorrect" class="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
+                    <CheckCircle2 class="w-4 h-4 text-emerald-600" />
+                    <span>BENAR</span>
+                    <span class="text-emerald-900 font-black">(+{{ res.pointsEarned }} Poin)</span>
+                  </div>
+                  <div v-else class="px-3.5 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
+                    <XCircle class="w-4 h-4 text-rose-600" />
+                    <span>SALAH</span>
+                    <span class="text-rose-900 font-bold">(0 Poin)</span>
+                  </div>
+                </div>
+
+                <!-- Question Text -->
+                <h4 class="text-sm sm:text-base font-bold text-[#0F3261] leading-relaxed">
+                  {{ res.questionText }}
+                </h4>
+
+                <!-- Student's Choice (Tanpa Kunci Jawaban Asli) -->
+                <div
+                  :class="[
+                    'p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm font-semibold flex items-center gap-3 border',
+                    res.isCorrect
+                      ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
+                      : 'bg-rose-50/60 border-rose-200 text-rose-950'
+                  ]"
+                >
+                  <div class="shrink-0 font-bold text-xs uppercase tracking-wider px-2 py-0.5 rounded-md"
+                    :class="res.isCorrect ? 'bg-emerald-200/60 text-emerald-800' : 'bg-rose-200/60 text-rose-800'"
+                  >
+                    Jawaban Kamu
+                  </div>
+                  <div class="flex-1 font-medium">
+                    <span class="font-bold mr-1">{{ String.fromCharCode(65 + res.userChoiceIndex) }}.</span>
+                    {{ res.userChoiceText }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Review Bottom Navigation Actions -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 flex-wrap">
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  @click="resetQuiz"
+                  class="px-5 py-3 rounded-2xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw class="w-4 h-4 text-slate-500" />
+                  Ulangi Kuis
+                </button>
                 <button
                   type="button"
                   @click="activeRightView = 'video'"
-                  class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                  class="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
                 >
                   <Video class="w-4 h-4 text-[#3587CE]" />
                   Kembali ke Video
                 </button>
               </div>
 
-              <h2 class="text-xl sm:text-2xl font-black text-[#0F3261]">
-                {{ materi.assessment?.title || 'Asesmen Pemahaman Materi' }}
-              </h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Pilihlah satu jawaban yang paling tepat untuk setiap pertanyaan di bawah ini untuk menguji pemahamanmu.
-              </p>
+              <!-- Button Navigasi ke Leaderboard -->
+              <button
+                type="button"
+                @click="openLeaderboard"
+                class="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-[#FF7315] hover:from-amber-600 hover:to-[#E86105] text-white font-black text-xs sm:text-sm shadow-md shadow-orange-500/25 flex items-center gap-2.5 transition active:scale-95 cursor-pointer"
+              >
+                <Trophy class="w-5 h-5 text-yellow-200" />
+                <span>Lihat Papan Peringkat (Leaderboard)</span>
+                <ChevronRight class="w-4 h-4 text-white/80" />
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- VIEW 3: LEADERBOARD PER MATERI (Skor Tertinggi & Waktu Stopwatch Tercepat) -->
+        <div v-else-if="activeRightView === 'leaderboard'" class="space-y-4">
+          
+          <!-- Leaderboard Header Card -->
+          <div class="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
+            <div class="h-3.5 bg-gradient-to-r from-amber-400 via-[#FF7315] to-orange-500"></div>
+            <div class="p-6 sm:p-7 space-y-4">
               
-              <div class="flex items-center gap-4 text-xs font-semibold text-slate-500 pt-3 border-t border-slate-100 flex-wrap">
-                <span class="flex items-center gap-1">📚 Materi: <strong class="text-slate-800">{{ materi.title }}</strong></span>
-                <span class="flex items-center gap-1">👤 Siswa: <strong class="text-slate-800">{{ studentName }}</strong></span>
-                <span class="flex items-center gap-1">📝 Jumlah: <strong class="text-slate-800">{{ quizQuestions.length }} Soal Pilihan Ganda</strong></span>
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <span class="px-3.5 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-1.5 shadow-xs">
+                  <Trophy class="w-4 h-4 text-amber-600" /> Papan Peringkat Materi
+                </span>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="quizFinished"
+                    type="button"
+                    @click="activeRightView = 'assessment'"
+                    class="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-indigo-200"
+                  >
+                    ← Review Jawaban
+                  </button>
+                  <button
+                    type="button"
+                    @click="activeRightView = 'video'"
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <Video class="w-4 h-4 text-[#3587CE]" />
+                    Kembali ke Video
+                  </button>
+                </div>
               </div>
+
+              <div>
+                <h2 class="text-xl sm:text-2xl font-black text-[#0F3261]">
+                  Papan Peringkat: {{ materi.title }}
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-600 leading-relaxed mt-1">
+                  Peringkat khusus untuk materi ini. Diurutkan berdasarkan perolehan <strong class="text-slate-800">Skor Tertinggi</strong>, dan jika skor sama, ditentukan oleh <strong class="text-slate-800">Waktu Tercepat (Stopwatch)</strong>.
+                </p>
+              </div>
+
+              <!-- User Position Highlight Banner -->
+              <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 rounded-2xl bg-white text-indigo-700 font-black text-xl flex items-center justify-center shadow-xs border border-indigo-100 shrink-0">
+                    {{ userRankInLeaderboard > 0 ? `#${userRankInLeaderboard}` : '-' }}
+                  </div>
+                  <div>
+                    <p class="text-xs text-indigo-700 font-bold uppercase tracking-wider">
+                      {{ userRankInLeaderboard > 0 ? 'Posisi Kamu Saat Ini' : 'Status Siswa' }}
+                    </p>
+                    <p class="text-sm font-extrabold text-[#0F3261]">
+                      {{ studentName }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-5 text-xs font-bold">
+                  <div v-if="userHighScore">
+                    <span class="text-slate-400 block text-[10px] uppercase">Rekor Nilai</span>
+                    <span class="text-amber-600 font-black text-base">{{ userHighScore.score }}</span>
+                    <span class="text-slate-400"> / {{ totalPossibleScore }}</span>
+                  </div>
+                  <div v-if="userHighScore">
+                    <span class="text-slate-400 block text-[10px] uppercase">Waktu Stopwatch</span>
+                    <span class="text-indigo-900 font-mono font-black text-base">
+                      {{ formatDuration(userHighScore.timeSeconds) }}
+                    </span>
+                  </div>
+                  <div v-else class="text-slate-500 italic font-semibold">
+                    Belum ada riwayat pengerjaan kuis
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <!-- Active Form (All Questions listed Google Form style) -->
-          <form v-if="!quizFinished" @submit.prevent="submitQuiz" class="space-y-4">
-            
-            <div
-              v-for="(q, qIdx) in quizQuestions"
-              :key="q.id || qIdx"
-              class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-sm space-y-4 transition hover:border-indigo-300"
-            >
-              <!-- Question Card Header -->
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg">
-                  Soal {{ qIdx + 1 }} dari {{ quizQuestions.length }}
-                </span>
-                <span v-if="selectedAnswers[qIdx] !== undefined" class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md flex items-center gap-1 border border-emerald-200">
-                  <CheckCircle2 class="w-3.5 h-3.5" /> Terjawab
-                </span>
-                <span v-else class="text-xs text-rose-500 font-bold">* Wajib diisi</span>
-              </div>
-
-              <!-- Question Text -->
-              <h3 class="text-sm sm:text-base font-bold text-[#0F3261] leading-relaxed">
-                {{ q.questionText }}
-              </h3>
-
-              <!-- Radio Options A, B, C, D (Google Form style) -->
-              <div class="space-y-2.5 pt-1">
-                <label
-                  v-for="(opt, oIdx) in q.options"
-                  :key="oIdx"
-                  :class="[
-                    'flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer select-none',
-                    selectedAnswers[qIdx] === oIdx
-                      ? 'bg-indigo-50/80 border-indigo-400 text-indigo-950 font-bold shadow-xs ring-1 ring-indigo-400/30'
-                      : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/80 hover:border-slate-300'
-                  ]"
-                >
-                  <div class="pt-0.5 shrink-0">
-                    <input
-                      type="radio"
-                      :name="`q-${qIdx}`"
-                      :value="oIdx"
-                      v-model="selectedAnswers[qIdx]"
-                      class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                    />
-                  </div>
-                  <div class="text-xs sm:text-sm leading-snug flex-1">
-                    <span class="font-bold mr-1.5 opacity-80">{{ String.fromCharCode(65 + oIdx) }}.</span>
-                    {{ opt }}
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <!-- Bottom Action Bar -->
-            <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 flex-wrap">
-              <button
-                type="button"
-                @click="activeRightView = 'video'"
-                class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition cursor-pointer"
-              >
-                Batal / Tonton Video
-              </button>
-
-              <button
-                type="submit"
-                :disabled="Object.keys(selectedAnswers).length < quizQuestions.length"
-                :class="[
-                  'px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold text-white transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95',
-                  Object.keys(selectedAnswers).length === quizQuestions.length
-                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 shadow-indigo-500/25'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                ]"
-              >
-                <CheckCircle2 class="w-5 h-5" />
-                Kirim Jawaban Asesmen
-              </button>
-            </div>
-          </form>
-
-          <!-- Result Screen (After submitting Google Form) -->
-          <div v-else class="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200/90 shadow-sm text-center space-y-6">
-            <div class="w-20 h-20 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto text-4xl shadow-inner animate-bounce">
+          <!-- KONDISI 1: STATE KOSONG (Belum Ada yang Mengerjakan Kuis) -->
+          <div v-if="materiLeaderboard.length === 0" class="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200/90 shadow-sm text-center space-y-5">
+            <div class="w-20 h-20 rounded-3xl bg-amber-50 text-amber-500 border border-amber-200 flex items-center justify-center mx-auto text-4xl shadow-inner">
               🏆
             </div>
-
-            <div>
-              <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3.5 py-1 rounded-full border border-emerald-200">
-                Form Asesmen Berhasil Terkirim!
-              </span>
-              <h3 class="text-2xl font-black text-[#0F3261] mt-3">
-                {{ quizScore >= 70 ? 'Luar Biasa, Pemahamanmu Sangat Baik! 🎉' : 'Kerja Bagus! Tetap Semangat Belajar Ya! 💪' }}
+            <div class="space-y-1.5 max-w-md mx-auto">
+              <h3 class="text-lg sm:text-xl font-black text-[#0F3261]">
+                Papan Peringkat Masih Kosong
               </h3>
-              <p class="text-xs text-slate-500 mt-1">
-                Jawaban kuis kamu telah berhasil direkam secara rinci.
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Belum ada siswa yang menyelesaikan kuis pada materi ini. Jadilah yang pertama mengerjakan dan raih posisi Juara 1 di papan peringkat!
               </p>
             </div>
-
-            <!-- Score Display Box -->
-            <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 max-w-sm mx-auto space-y-1">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Nilai Akhir Kamu</p>
-              <div class="text-5xl font-black text-[#3587CE]">
-                {{ quizScore }} <span class="text-lg font-bold text-slate-400">/ 100</span>
-              </div>
-              <p class="text-xs text-emerald-600 font-bold pt-1">
-                ✓ Berhasil diselesaikan oleh {{ studentName }}
-              </p>
-            </div>
-
-            <div class="flex items-center justify-center gap-3 pt-2">
+            <div class="pt-2 flex items-center justify-center gap-3 flex-wrap">
               <button
                 type="button"
-                @click="resetQuiz"
-                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                @click="openQuiz"
+                class="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#FF7315] to-amber-500 hover:from-[#E86105] hover:to-amber-600 text-white text-xs sm:text-sm font-extrabold transition shadow-md shadow-orange-500/25 flex items-center gap-2 cursor-pointer active:scale-95"
               >
-                Ulangi Kuis
+                <CheckCircle2 class="w-4 h-4" />
+                Mulai Kerjakan Kuis Sekarang
               </button>
               <button
                 type="button"
                 @click="activeRightView = 'video'"
-                class="px-7 py-3 rounded-xl bg-[#0F3261] hover:bg-[#18447d] text-white text-xs font-bold transition cursor-pointer shadow-md"
+                class="px-5 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
               >
+                <Video class="w-4 h-4 text-[#3587CE]" />
                 Kembali ke Video
               </button>
+            </div>
+          </div>
+
+          <!-- KONDISI 2: DATA TERISI (Ada Siswa yang Sudah Menyelesaikan Kuis) -->
+          <div v-else class="space-y-4">
+            <!-- Top 3 Podium (Visual Juara 1, 2, 3 jika peserta >= 3) -->
+            <div v-if="materiLeaderboard.length >= 3" class="grid grid-cols-3 gap-2 sm:gap-4 items-end pt-2 px-1">
+              <!-- Rank 2: Silver (Kiri) -->
+              <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 text-center shadow-xs flex flex-col items-center">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl sm:text-2xl shadow-inner border border-slate-200">
+                  🥈
+                </div>
+                <div class="mt-2 font-extrabold text-xs sm:text-sm text-[#0F3261] truncate w-full">
+                  {{ materiLeaderboard[1].userName }}
+                </div>
+                <div class="text-xs font-black text-slate-700 mt-1">
+                  {{ materiLeaderboard[1].score }} <span class="text-[10px] font-bold text-slate-400">Poin</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                  ⏱️ {{ formatDuration(materiLeaderboard[1].timeSeconds) }}
+                </div>
+                <span class="mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  Juara 2
+                </span>
+              </div>
+
+              <!-- Rank 1: Gold (Tengah - Elevated) -->
+              <div class="bg-gradient-to-b from-amber-50 to-white rounded-3xl p-5 sm:p-6 border-2 border-amber-300 text-center shadow-md flex flex-col items-center transform -translate-y-2">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-amber-100 flex items-center justify-center text-2xl sm:text-3xl shadow-inner border border-amber-200 animate-pulse">
+                  🥇
+                </div>
+                <div class="mt-2 font-black text-sm sm:text-base text-[#0F3261] truncate w-full">
+                  {{ materiLeaderboard[0].userName }}
+                </div>
+                <div class="text-sm font-black text-amber-600 mt-1">
+                  {{ materiLeaderboard[0].score }} <span class="text-xs font-bold text-slate-400">Poin</span>
+                </div>
+                <div class="text-xs font-mono text-slate-700 font-bold mt-0.5">
+                  ⚡ {{ formatDuration(materiLeaderboard[0].timeSeconds) }}
+                </div>
+                <span class="mt-2 text-[11px] font-black px-3 py-0.5 rounded-full bg-amber-400 text-slate-900 shadow-xs">
+                  👑 Juara 1
+                </span>
+              </div>
+
+              <!-- Rank 3: Bronze (Kanan) -->
+              <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 text-center shadow-xs flex flex-col items-center">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-50 flex items-center justify-center text-xl sm:text-2xl shadow-inner border border-orange-200">
+                  🥉
+                </div>
+                <div class="mt-2 font-extrabold text-xs sm:text-sm text-[#0F3261] truncate w-full">
+                  {{ materiLeaderboard[2].userName }}
+                </div>
+                <div class="text-xs font-black text-slate-700 mt-1">
+                  {{ materiLeaderboard[2].score }} <span class="text-[10px] font-bold text-slate-400">Poin</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                  ⏱️ {{ formatDuration(materiLeaderboard[2].timeSeconds) }}
+                </div>
+                <span class="mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">
+                  Juara 3
+                </span>
+              </div>
+            </div>
+
+            <!-- Full Leaderboard Table -->
+            <div class="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
+              <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-sm font-extrabold text-[#0F3261]">
+                  Daftar Lengkap Peringkat
+                </h3>
+                <span class="text-xs font-semibold text-slate-400">
+                  {{ materiLeaderboard.length }} Peserta Terdaftar
+                </span>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr class="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[11px] border-b border-slate-100">
+                      <th class="py-3 px-4 sm:px-6 w-16 text-center">Rank</th>
+                      <th class="py-3 px-4 sm:px-6">Nama Siswa</th>
+                      <th class="py-3 px-4 sm:px-6 text-center">Skor Akhir</th>
+                      <th class="py-3 px-4 sm:px-6 text-center">Waktu Pengerjaan</th>
+                      <th class="py-3 px-4 sm:px-6 text-right">Rekor</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <tr
+                      v-for="(row, idx) in materiLeaderboard"
+                      :key="row.userId || idx"
+                      :class="[
+                        'transition-colors',
+                        row.isCurrentUser
+                          ? 'bg-amber-50/80 font-bold ring-1 ring-inset ring-amber-300'
+                          : 'hover:bg-slate-50/60'
+                      ]"
+                    >
+                      <!-- Rank Column -->
+                      <td class="py-3.5 px-4 sm:px-6 text-center">
+                        <span v-if="idx === 0" class="text-lg">🥇</span>
+                        <span v-else-if="idx === 1" class="text-lg">🥈</span>
+                        <span v-else-if="idx === 2" class="text-lg">🥉</span>
+                        <span v-else class="font-extrabold text-slate-500">#{{ idx + 1 }}</span>
+                      </td>
+
+                      <!-- Name Column -->
+                      <td class="py-3.5 px-4 sm:px-6">
+                        <div class="flex items-center gap-2.5">
+                          <span class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-sm shrink-0">
+                            {{ row.userAvatar || '👧' }}
+                          </span>
+                          <div class="min-w-0">
+                            <p class="font-extrabold text-slate-800 truncate flex items-center gap-1.5">
+                              {{ row.userName }}
+                              <span v-if="row.isCurrentUser" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-900">
+                                Kamu
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <!-- Score Column -->
+                      <td class="py-3.5 px-4 sm:px-6 text-center">
+                        <span class="font-black text-[#0F3261]">{{ row.score }}</span>
+                        <span class="text-slate-400 text-xs font-semibold"> / {{ row.totalPoints || totalPossibleScore }}</span>
+                      </td>
+
+                      <!-- Duration Column -->
+                      <td class="py-3.5 px-4 sm:px-6 text-center font-mono font-bold text-slate-700">
+                        ⏱️ {{ formatDuration(row.timeSeconds) }}
+                      </td>
+
+                      <!-- Date/Status Column -->
+                      <td class="py-3.5 px-4 sm:px-6 text-right text-xs text-slate-400">
+                        {{ row.date ? new Date(row.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Hari ini' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Leaderboard Footer Buttons -->
+              <div class="p-6 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    @click="resetQuiz"
+                    class="px-5 py-3 rounded-2xl bg-[#0F3261] hover:bg-[#18447d] text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <RotateCcw class="w-4 h-4 text-white/80" />
+                    Coba Lagi Pecahkan Rekor
+                  </button>
+                  <button
+                    type="button"
+                    @click="activeRightView = 'video'"
+                    class="px-5 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <Video class="w-4 h-4 text-[#3587CE]" />
+                    Kembali ke Video
+                  </button>
+                </div>
+
+                <button
+                  v-if="quizFinished"
+                  type="button"
+                  @click="activeRightView = 'assessment'"
+                  class="px-6 py-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                >
+                  Review Jawaban Kuis
+                  <ChevronRight class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 

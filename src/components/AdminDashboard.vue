@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   materiList, addMateri, updateMateri, deleteMateri, resetMateri, isLoadingMateri, RELIABLE_MODE_VIDEOS, sanitizeVideoUrl, forceSyncToSupabase
 } from '../lib/materiService'
@@ -35,6 +35,7 @@ const activeFormTab = ref('general')
 // Search/filter in table
 const tableSearch = ref('')
 const selectedJenjangFilter = ref('Semua')
+const selectedKelasFilter = ref('Semua')
 
 // Upload state
 const isUploadingVideo = ref(false)
@@ -45,8 +46,73 @@ const dragOverKey = ref(null)
 const isUploadingImage = ref(false)
 const imageUploadProgress = ref(0)
 
+// Konfigurasi Pilihan Kelas berdasarkan Jenjang (Murni Kelas tanpa Fase)
+const levelOptionsByJenjang = {
+  SD: [
+    { value: 'Kelas 1', label: 'Kelas 1' },
+    { value: 'Kelas 2', label: 'Kelas 2' },
+    { value: 'Kelas 3', label: 'Kelas 3' },
+    { value: 'Kelas 4', label: 'Kelas 4' },
+    { value: 'Kelas 5', label: 'Kelas 5' },
+    { value: 'Kelas 6', label: 'Kelas 6' }
+  ],
+  SMP: [
+    { value: 'Kelas 7', label: 'Kelas 7' },
+    { value: 'Kelas 8', label: 'Kelas 8' },
+    { value: 'Kelas 9', label: 'Kelas 9' }
+  ],
+  SMA: [
+    { value: 'Kelas 10', label: 'Kelas 10' },
+    { value: 'Kelas 11', label: 'Kelas 11' },
+    { value: 'Kelas 12', label: 'Kelas 12' }
+  ]
+}
+
+const currentLevelOptions = computed(() => {
+  const jenjang = currentForm.value?.jenjang || 'SD'
+  return levelOptionsByJenjang[jenjang] || levelOptionsByJenjang.SD
+})
+
+const normalizeLevelForForm = (rawLevel, jenjang) => {
+  const targetJenjang = jenjang || 'SD'
+  const options = levelOptionsByJenjang[targetJenjang] || levelOptionsByJenjang.SD
+  if (!rawLevel) return options[0].value
+  
+  const exact = options.find(o => o.value.toLowerCase() === rawLevel.trim().toLowerCase())
+  if (exact) return exact.value
+
+  const s = rawLevel.toLowerCase()
+  if (targetJenjang === 'SD') {
+    if (s.includes('kelas 1') || (s.includes('kelas i') && !s.includes('kelas iv') && !s.includes('kelas ix'))) return 'Kelas 1'
+    if (s.includes('kelas 2') || s.includes('kelas ii')) return 'Kelas 2'
+    if (s.includes('kelas 3') || s.includes('kelas iii')) return 'Kelas 3'
+    if (s.includes('kelas 4') || s.includes('kelas iv')) return 'Kelas 4'
+    if (s.includes('kelas 5') || s.includes('kelas v')) return 'Kelas 5'
+    if (s.includes('kelas 6') || s.includes('kelas vi')) return 'Kelas 6'
+  } else if (targetJenjang === 'SMP') {
+    if (s.includes('kelas 7') || s.includes('kelas vii')) return 'Kelas 7'
+    if (s.includes('kelas 8') || s.includes('kelas viii')) return 'Kelas 8'
+    if (s.includes('kelas 9') || s.includes('kelas ix')) return 'Kelas 9'
+  } else if (targetJenjang === 'SMA') {
+    if (s.includes('kelas 10') || (s.includes('kelas x') && !s.includes('kelas xi') && !s.includes('kelas xii'))) return 'Kelas 10'
+    if (s.includes('kelas 11') || (s.includes('kelas xi') && !s.includes('kelas xii'))) return 'Kelas 11'
+    if (s.includes('kelas 12') || s.includes('kelas xii')) return 'Kelas 12'
+  }
+  return options[0].value
+}
+
 // Form data
 const currentForm = ref(getEmptyForm())
+
+// Sinkronisasi otomatis saat user mengganti Jenjang di form
+watch(() => currentForm.value?.jenjang, (newJenjang) => {
+  if (!newJenjang || !currentForm.value) return
+  const options = levelOptionsByJenjang[newJenjang] || levelOptionsByJenjang.SD
+  const exists = options.some(o => o.value === currentForm.value.level)
+  if (!exists) {
+    currentForm.value.level = options[0].value
+  }
+})
 
 function getEmptyForm() {
   return {
@@ -54,7 +120,7 @@ function getEmptyForm() {
     title: '',
     jenjang: 'SD',
     mataPelajaran: 'IPAS',
-    level: 'IPAS • Kelas IV • Fase B',
+    level: 'Kelas 1',
     description: 'Yuk ikuti perjalanan Es Batu dan temukan bagaimana benda dapat berubah wujud!',
     badge: 'Gratis',
     duration: '± 5 menit',
@@ -93,6 +159,7 @@ function getEmptyForm() {
         {
           id: 'q-1',
           questionText: 'Apa yang terjadi pada es batu padat ketika dipanaskan?',
+          points: 50,
           options: [
             'Mencair menjadi air cair',
             'Membeku menjadi es batu keras',
@@ -104,6 +171,7 @@ function getEmptyForm() {
         {
           id: 'q-2',
           questionText: 'Proses perubahan wujud air cair menjadi uap gas disebut...',
+          points: 50,
           options: [
             'Mencair',
             'Menguap',
@@ -152,6 +220,16 @@ const openEditForm = (item) => {
     }
   }
 
+  if (copy.assessment?.questions) {
+    copy.assessment.questions.forEach(q => {
+      if (!q.points || isNaN(q.points)) q.points = 25
+    })
+  }
+
+  if (copy.jenjang) {
+    copy.level = normalizeLevelForForm(copy.level, copy.jenjang)
+  }
+
   currentForm.value = copy
   activeFormTab.value = 'general'
   showForm.value = true
@@ -181,6 +259,7 @@ const addQuestion = () => {
   currentForm.value.assessment.questions.push({
     id: `q-${Date.now()}`,
     questionText: '',
+    points: 25,
     options: ['', '', '', ''],
     correctOptionIndex: 0
   })
@@ -216,16 +295,43 @@ const handleDelete = async (id, title) => {
 }
 
 const isSyncing = ref(false)
-const handleForceSync = async () => {
-  if (!confirm('Sync semua data materi ke Supabase? Ini akan menimpa data lama di Supabase dengan data terkini (termasuk video yang sudah diupload).')) return
+const syncModal = ref({
+  isOpen: false,
+  status: 'confirm', // 'confirm' | 'syncing' | 'success' | 'error'
+  count: 0,
+  errorMessage: ''
+})
+
+const openSyncModal = () => {
+  syncModal.value = {
+    isOpen: true,
+    status: 'confirm',
+    count: 0,
+    errorMessage: ''
+  }
+}
+
+const closeSyncModal = () => {
+  if (syncModal.value.status === 'syncing') return
+  syncModal.value.isOpen = false
+}
+
+const executeSync = async () => {
+  syncModal.value.status = 'syncing'
   isSyncing.value = true
   try {
     const result = await forceSyncToSupabase()
     if (result.success) {
-      alert(`✅ Berhasil sync ${result.count} materi ke Supabase! Semua device sekarang bisa melihat video terbaru.`)
+      syncModal.value.status = 'success'
+      syncModal.value.count = result.count || materiList.value.length
+      playMascotChime()
     } else {
-      alert(`❌ Sync gagal: ${result.error}`)
+      syncModal.value.status = 'error'
+      syncModal.value.errorMessage = result.error || 'Gagal menyimpan pembaruan materi ke server.'
     }
+  } catch (err) {
+    syncModal.value.status = 'error'
+    syncModal.value.errorMessage = err.message || 'Terjadi gangguan saat menghubungi server online.'
   } finally {
     isSyncing.value = false
   }
@@ -319,10 +425,33 @@ const totalVideos = computed(() => materiList.value.reduce((a, m) => {
   return a + count
 }, 0))
 
+const availableTableKelasOptions = computed(() => {
+  if (selectedJenjangFilter.value === 'SD') return levelOptionsByJenjang.SD.map(o => o.value)
+  if (selectedJenjangFilter.value === 'SMP') return levelOptionsByJenjang.SMP.map(o => o.value)
+  if (selectedJenjangFilter.value === 'SMA') return levelOptionsByJenjang.SMA.map(o => o.value)
+  return [
+    ...levelOptionsByJenjang.SD.map(o => o.value),
+    ...levelOptionsByJenjang.SMP.map(o => o.value),
+    ...levelOptionsByJenjang.SMA.map(o => o.value)
+  ]
+})
+
+watch(selectedJenjangFilter, (newJ) => {
+  if (selectedKelasFilter.value !== 'Semua') {
+    const valid = availableTableKelasOptions.value
+    if (!valid.includes(selectedKelasFilter.value)) {
+      selectedKelasFilter.value = 'Semua'
+    }
+  }
+})
+
 // Filtered table
 const filteredMateri = computed(() => {
   let list = materiList.value
   if (selectedJenjangFilter.value !== 'Semua') list = list.filter(m => m.jenjang === selectedJenjangFilter.value)
+  if (selectedKelasFilter.value !== 'Semua') {
+    list = list.filter(m => normalizeLevelForForm(m.level, m.jenjang) === selectedKelasFilter.value)
+  }
   if (tableSearch.value.trim()) {
     const q = tableSearch.value.toLowerCase()
     list = list.filter(m => m.title?.toLowerCase().includes(q) || m.level?.toLowerCase().includes(q))
@@ -629,8 +758,19 @@ const navItems = [
                           </select>
                         </div>
                         <div>
-                          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Level / Fase</label>
-                          <input v-model="currentForm.level" placeholder="Kelas IV • Fase B" class="w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#3DA5FF] focus:outline-none text-sm" />
+                          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Kelas</label>
+                          <select
+                            v-model="currentForm.level"
+                            class="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:border-[#3DA5FF] focus:outline-none cursor-pointer"
+                          >
+                            <option
+                              v-for="opt in currentLevelOptions"
+                              :key="opt.value"
+                              :value="opt.value"
+                            >
+                              {{ opt.label }}
+                            </option>
+                          </select>
                         </div>
                       </div>
                       <div class="grid grid-cols-2 gap-3">
@@ -1052,6 +1192,14 @@ const navItems = [
                     />
                   </div>
 
+                  <!-- Ringkasan Total Poin -->
+                  <div class="flex items-center justify-between p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100 text-xs">
+                    <span class="font-bold text-indigo-950">Total Akumulasi Poin Kuis:</span>
+                    <span class="font-black text-sm text-indigo-700 bg-white border border-indigo-200 px-3 py-1 rounded-lg shadow-2xs">
+                      {{ currentForm.assessment?.questions?.reduce((acc, q) => acc + (Number(q.points) || 25), 0) || 0 }} Poin
+                    </span>
+                  </div>
+
                   <!-- Questions List -->
                   <div v-if="!currentForm.assessment?.questions?.length" class="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                     <HelpCircle class="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -1072,10 +1220,24 @@ const navItems = [
                       :key="q.id || qIdx"
                       class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4 relative group hover:border-indigo-300 transition"
                     >
-                      <div class="flex items-center justify-between border-b border-slate-200/80 pb-3">
-                        <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-3 py-1 rounded-lg">
-                          Soal {{ qIdx + 1 }}
-                        </span>
+                      <div class="flex items-center justify-between border-b border-slate-200/80 pb-3 flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                          <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-3 py-1 rounded-lg">
+                            Soal {{ qIdx + 1 }}
+                          </span>
+                          <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 shadow-2xs">
+                            <span class="text-xs font-bold text-slate-500">Bobot:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              v-model.number="q.points"
+                              placeholder="25"
+                              class="w-14 text-center text-xs font-black text-indigo-600 focus:outline-none"
+                            />
+                            <span class="text-xs font-bold text-slate-400">Poin</span>
+                          </div>
+                        </div>
                         <button
                           type="button"
                           @click="removeQuestion(qIdx)"
@@ -1320,16 +1482,28 @@ const navItems = [
                   ]"
                 >{{ j }}</button>
               </div>
+
+              <!-- Kelas filter -->
+              <div class="flex items-center shrink-0">
+                <select
+                  v-model="selectedKelasFilter"
+                  class="px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 focus:outline-none focus:border-[#3DA5FF] cursor-pointer"
+                >
+                  <option value="Semua">Semua Kelas</option>
+                  <option v-for="k in availableTableKelasOptions" :key="k" :value="k">{{ k }}</option>
+                </select>
+              </div>
               <button @click="resetMateri" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer transition shrink-0">
                 <RefreshCw class="w-3.5 h-3.5" /> Reset
               </button>
               <button
-                @click="handleForceSync"
+                @click="openSyncModal"
                 :disabled="isSyncing"
+                title="Simpan seluruh materi dan video pembelajaran ke server online"
                 class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-blue-200 text-xs font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer transition shrink-0 disabled:opacity-50"
               >
                 <CloudUpload class="w-3.5 h-3.5" />
-                {{ isSyncing ? 'Menyinkron...' : 'Sync ke Supabase' }}
+                {{ isSyncing ? 'Menyimpan...' : 'Simpan ke Cloud' }}
               </button>
             </div>
 
@@ -1347,7 +1521,7 @@ const navItems = [
               <!-- Loading -->
               <div v-if="isLoadingMateri" class="py-12 text-center">
                 <RefreshCw class="w-6 h-6 animate-spin mx-auto mb-2 text-[#3DA5FF]" />
-                <p class="text-sm text-slate-400">Memuat dari Supabase...</p>
+                <p class="text-sm text-slate-400">Memuat materi online...</p>
               </div>
 
               <!-- Rows -->
@@ -1909,4 +2083,144 @@ const navItems = [
       </div>
     </div>
   </template>
+
+  <!-- ==================== MODERN SYNC CLOUD MODAL ==================== -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="syncModal.isOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        @click.self="closeSyncModal"
+      >
+        <div
+          class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all p-6 sm:p-7 text-center space-y-5 relative"
+        >
+          <!-- Close button -->
+          <button
+            v-if="syncModal.status !== 'syncing'"
+            type="button"
+            @click="closeSyncModal"
+            class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+          >
+            <X class="w-5 h-5" />
+          </button>
+
+          <!-- Step 1: Confirm -->
+          <template v-if="syncModal.status === 'confirm'">
+            <div class="w-16 h-16 rounded-2xl bg-blue-50 text-[#3587CE] flex items-center justify-center mx-auto shadow-inner">
+              <CloudUpload class="w-8 h-8" />
+            </div>
+            <div class="space-y-2">
+              <h3 class="text-xl font-black text-[#0F3261]">
+                Simpan Materi ke Cloud?
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed px-2">
+                Semua data materi dan video pembelajaran terbaru akan disimpan ke server online. Siswa dan guru di semua perangkat dapat langsung melihat pembaruan ini.
+              </p>
+            </div>
+            <div class="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                @click="closeSyncModal"
+                class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                @click="executeSync"
+                class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#3587CE] to-[#3DA5FF] text-white text-xs sm:text-sm font-extrabold shadow-md hover:shadow-lg active:scale-95 transition cursor-pointer"
+              >
+                <CloudUpload class="w-4 h-4" />
+                <span>Ya, Simpan Sekarang</span>
+              </button>
+            </div>
+          </template>
+
+          <!-- Step 2: Syncing in progress -->
+          <template v-else-if="syncModal.status === 'syncing'">
+            <div class="w-16 h-16 rounded-2xl bg-sky-50 text-[#3DA5FF] flex items-center justify-center mx-auto shadow-inner">
+              <RefreshCw class="w-8 h-8 animate-spin" />
+            </div>
+            <div class="space-y-2">
+              <h3 class="text-xl font-black text-[#0F3261]">
+                Sedang Menyimpan ke Cloud...
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed px-2">
+                Mohon tunggu sebentar, data materi dan video sedang disinkronkan ke server online.
+              </p>
+            </div>
+            <div class="py-2 px-6">
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-[#3587CE] to-[#3DA5FF] rounded-full animate-pulse w-3/4"></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Step 3: Success -->
+          <template v-else-if="syncModal.status === 'success'">
+            <div class="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 class="w-8 h-8" />
+            </div>
+            <div class="space-y-2">
+              <h3 class="text-xl font-black text-[#0F3261]">
+                Berhasil Disimpan!
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed px-2">
+                Sebanyak <strong class="text-emerald-600 font-extrabold">{{ syncModal.count }} materi</strong> berhasil diperbarui di server online. Semua perangkat dan siswa sekarang sudah dapat melihat materi serta video terbaru.
+              </p>
+            </div>
+            <div class="pt-2">
+              <button
+                type="button"
+                @click="closeSyncModal"
+                class="w-full py-2.5 rounded-xl bg-[#0F3261] text-white text-xs sm:text-sm font-extrabold hover:bg-[#1a4782] transition shadow-md active:scale-95 cursor-pointer"
+              >
+                Selesai
+              </button>
+            </div>
+          </template>
+
+          <!-- Step 4: Error -->
+          <template v-else-if="syncModal.status === 'error'">
+            <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <AlertCircle class="w-8 h-8" />
+            </div>
+            <div class="space-y-2">
+              <h3 class="text-xl font-black text-rose-600">
+                Gagal Menyimpan
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-500 leading-relaxed px-2">
+                {{ syncModal.errorMessage || 'Terjadi gangguan saat menghubungkan ke server online. Silakan periksa koneksi internet Anda.' }}
+              </p>
+            </div>
+            <div class="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                @click="closeSyncModal"
+                class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                @click="executeSync"
+                class="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-rose-600 text-white text-xs sm:text-sm font-extrabold hover:bg-rose-700 active:scale-95 transition cursor-pointer"
+              >
+                <RefreshCw class="w-4 h-4" />
+                <span>Coba Lagi</span>
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

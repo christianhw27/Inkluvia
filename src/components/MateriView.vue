@@ -22,14 +22,65 @@ const emit = defineEmits(['openDetail'])
 // Filter States
 const selectedJenjang = ref('Semua')
 const selectedMapel = ref('Semua')
+const selectedKelas = ref('Semua')
 
 // Filter Options
 const jenjangOptions = ['Semua', 'SD', 'SMP', 'SMA']
 const mapelOptions = ['Semua', 'IPAS', 'Matematika', 'Bahasa Indonesia']
 
+// Daftar Kelas per Jenjang
+const kelasByJenjang = {
+  SD: ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'],
+  SMP: ['Kelas 7', 'Kelas 8', 'Kelas 9'],
+  SMA: ['Kelas 10', 'Kelas 11', 'Kelas 12']
+}
+
+const allKelasList = [
+  ...kelasByJenjang.SD,
+  ...kelasByJenjang.SMP,
+  ...kelasByJenjang.SMA
+]
+
+const kelasOptions = computed(() => {
+  if (selectedJenjang.value === 'SD') return ['Semua', ...kelasByJenjang.SD]
+  if (selectedJenjang.value === 'SMP') return ['Semua', ...kelasByJenjang.SMP]
+  if (selectedJenjang.value === 'SMA') return ['Semua', ...kelasByJenjang.SMA]
+  return ['Semua', ...allKelasList]
+})
+
+const getItemKelas = (item) => {
+  if (!item) return ''
+  const lvl = (item.level || '').toLowerCase()
+  if (lvl.includes('kelas 10') || (lvl.includes('kelas x') && !lvl.includes('kelas xi') && !lvl.includes('kelas xii'))) return 'Kelas 10'
+  if (lvl.includes('kelas 11') || (lvl.includes('kelas xi') && !lvl.includes('kelas xii'))) return 'Kelas 11'
+  if (lvl.includes('kelas 12') || lvl.includes('kelas xii')) return 'Kelas 12'
+  if (lvl.includes('kelas 1') || (lvl.includes('kelas i') && !lvl.includes('kelas iv') && !lvl.includes('kelas ix'))) return 'Kelas 1'
+  if (lvl.includes('kelas 2') || lvl.includes('kelas ii')) return 'Kelas 2'
+  if (lvl.includes('kelas 3') || lvl.includes('kelas iii')) return 'Kelas 3'
+  if (lvl.includes('kelas 4') || lvl.includes('kelas iv')) return 'Kelas 4'
+  if (lvl.includes('kelas 5') || lvl.includes('kelas v')) return 'Kelas 5'
+  if (lvl.includes('kelas 6') || lvl.includes('kelas vi')) return 'Kelas 6'
+  if (lvl.includes('kelas 7') || lvl.includes('kelas vii')) return 'Kelas 7'
+  if (lvl.includes('kelas 8') || lvl.includes('kelas viii')) return 'Kelas 8'
+  if (lvl.includes('kelas 9') || lvl.includes('kelas ix')) return 'Kelas 9'
+  return ''
+}
+
+const onSelectJenjang = (opt) => {
+  playButtonPop()
+  selectedJenjang.value = opt
+  if (selectedKelas.value !== 'Semua') {
+    const valid = opt === 'Semua' ? allKelasList : (kelasByJenjang[opt] || [])
+    if (!valid.includes(selectedKelas.value)) {
+      selectedKelas.value = 'Semua'
+    }
+  }
+}
+
 const hasActiveFilter = computed(() =>
   selectedJenjang.value !== 'Semua' ||
   selectedMapel.value !== 'Semua' ||
+  selectedKelas.value !== 'Semua' ||
   props.searchQuery.trim() !== ''
 )
 
@@ -37,6 +88,10 @@ const filteredMateri = computed(() => {
   return materiList.value.filter((item) => {
     if (selectedJenjang.value !== 'Semua' && item.jenjang !== selectedJenjang.value) return false
     if (selectedMapel.value !== 'Semua' && item.mataPelajaran !== selectedMapel.value) return false
+    if (selectedKelas.value !== 'Semua') {
+      const k = getItemKelas(item)
+      if (k !== selectedKelas.value) return false
+    }
     if (props.searchQuery.trim()) {
       const q = props.searchQuery.toLowerCase()
       if (
@@ -52,6 +107,7 @@ const resetFilters = () => {
   playButtonPop()
   selectedJenjang.value = 'Semua'
   selectedMapel.value = 'Semua'
+  selectedKelas.value = 'Semua'
 }
 </script>
 
@@ -140,44 +196,73 @@ const resetFilters = () => {
             </button>
           </div>
 
-          <!-- 2 Area Filter -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/60 p-5 rounded-2xl border border-slate-100">
-            <!-- Filter 1: Jenjang -->
-            <div class="space-y-2 text-left">
-              <label class="text-xs font-black text-[#0F3261] block">
-                Jenjang
-              </label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="opt in jenjangOptions"
-                  :key="opt"
-                  @click="selectedJenjang = opt; playButtonPop()"
-                  :class="[
-                    'px-3.5 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer',
-                    selectedJenjang === opt
-                      ? 'bg-[#0F3261] text-white shadow-sm'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  ]"
-                >
-                  {{ opt }}
-                </button>
+          <!-- Filter Area -->
+          <div class="space-y-4 bg-slate-50/60 p-5 rounded-2xl border border-slate-100">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Filter 1: Jenjang -->
+              <div class="space-y-2 text-left">
+                <label class="text-xs font-black text-[#0F3261] block">
+                  Jenjang
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="opt in jenjangOptions"
+                    :key="opt"
+                    @click="onSelectJenjang(opt)"
+                    :class="[
+                      'px-3.5 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer',
+                      selectedJenjang === opt
+                        ? 'bg-[#0F3261] text-white shadow-sm'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    ]"
+                  >
+                    {{ opt }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Filter 2: Mata Pelajaran -->
+              <div class="space-y-2 text-left">
+                <label class="text-xs font-black text-[#0F3261] block">
+                  Mata Pelajaran
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="opt in mapelOptions"
+                    :key="opt"
+                    @click="selectedMapel = opt; playButtonPop()"
+                    :class="[
+                      'px-3.5 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer',
+                      selectedMapel === opt
+                        ? 'bg-[#3DA5FF] text-white shadow-sm'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    ]"
+                  >
+                    {{ opt }}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <!-- Filter 2: Mata Pelajaran -->
-            <div class="space-y-2 text-left">
-              <label class="text-xs font-black text-[#0F3261] block">
-                Mata Pelajaran
-              </label>
+            <!-- Filter 3: Kelas -->
+            <div class="space-y-2 text-left pt-3 border-t border-slate-200/60">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-black text-[#0F3261] block">
+                  Kelas
+                </label>
+                <span v-if="selectedJenjang !== 'Semua'" class="text-[11px] font-bold text-slate-400">
+                  Menampilkan kelas untuk jenjang {{ selectedJenjang }}
+                </span>
+              </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-for="opt in mapelOptions"
+                  v-for="opt in kelasOptions"
                   :key="opt"
-                  @click="selectedMapel = opt; playButtonPop()"
+                  @click="selectedKelas = opt; playButtonPop()"
                   :class="[
                     'px-3.5 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer',
-                    selectedMapel === opt
-                      ? 'bg-[#3DA5FF] text-white shadow-sm'
+                    selectedKelas === opt
+                      ? 'bg-[#FF7315] text-white shadow-sm'
                       : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                   ]"
                 >

@@ -91,6 +91,7 @@ const initialMateri = [
         {
           id: 'q-1',
           questionText: 'Apa yang terjadi pada es batu padat ketika dipanaskan?',
+          points: 35,
           options: [
             'Mencair menjadi air cair',
             'Membeku menjadi es batu keras',
@@ -102,6 +103,7 @@ const initialMateri = [
         {
           id: 'q-2',
           questionText: 'Proses perubahan wujud air cair menjadi uap gas disebut...',
+          points: 35,
           options: [
             'Mencair',
             'Menguap',
@@ -113,6 +115,7 @@ const initialMateri = [
         {
           id: 'q-3',
           questionText: 'Ketika uap air mengenai udara dingin, uap berubah menjadi titik air. Proses ini disebut...',
+          points: 30,
           options: [
             'Mengembun',
             'Menguap',
@@ -167,6 +170,7 @@ const initialMateri = [
         {
           id: 'q-2-1',
           questionText: 'Berapa hasil dari 2 apel ditambah 1 apel?',
+          points: 100,
           options: ['2 apel', '3 apel', '4 apel', '5 apel'],
           correctOptionIndex: 1
         }
@@ -216,6 +220,7 @@ const initialMateri = [
         {
           id: 'q-3-1',
           questionText: 'Planet terdekat dari matahari adalah...',
+          points: 100,
           options: ['Merkurius', 'Venus', 'Bumi', 'Mars'],
           correctOptionIndex: 0
         }
