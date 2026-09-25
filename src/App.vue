@@ -169,6 +169,7 @@ const triggerMascot = () => {
 // Active item and mode tracking
 const activeMateriItem = ref(null)
 const chosenMode = ref('standard')
+const modeSelectSource = ref('materi')
 
 // Auth Page state
 const authTab = ref('login')
@@ -278,6 +279,9 @@ const handleAuthenticated = (user) => {
         currentNav.value = 'beranda'
       }
     } else {
+      if (tab === 'mode-select') {
+        modeSelectSource.value = 'materi'
+      }
       currentNav.value = tab
     }
     return
@@ -377,7 +381,6 @@ const navigateTo = (tab) => {
 }
 
 // Flow Handlers protected by Middleware
-// Flow Handlers protected by Middleware
 const handleOpenDetail = (item) => {
   const targetItem = item || materiList.value[0]
   const guard = canAccessRoute('mode-select')
@@ -387,6 +390,7 @@ const handleOpenDetail = (item) => {
     return
   }
   activeMateriItem.value = targetItem
+  modeSelectSource.value = currentNav.value || 'materi'
   currentNav.value = 'mode-select'
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
@@ -398,6 +402,7 @@ const handleStartAdventure = () => {
     navigateToAuth(guard.tab || 'login', guard.reason)
     return
   }
+  modeSelectSource.value = currentNav.value || 'materi'
   currentNav.value = 'mode-select'
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
@@ -1903,7 +1908,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     <main v-else-if="currentNav === 'mode-select' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-6 flex-1">
       <ModeSelectView
         :materi="activeMateriItem || materiList[0]"
-        @back="navigateTo('materi-detail')"
+        @back="navigateTo(modeSelectSource || 'materi')"
         @select-mode="handleModeSelected"
       />
     </main>
