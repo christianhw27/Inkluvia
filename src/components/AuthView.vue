@@ -1,5 +1,14 @@
 <script setup>
-import { loginUser, registerUser, requestEmailVerificationOtp, verifyEmailOtp, currentUser } from '../lib/authService'
+import { ref, watch } from 'vue'
+import {
+  loginUser,
+  registerUser,
+  requestEmailVerificationOtp,
+  verifyEmailOtp,
+  requestPasswordResetOtp,
+  resetPasswordWithOtp,
+  currentUser
+} from '../lib/authService'
 import { playMascotChime } from '../lib/soundEffects'
 import {
   Mail,
@@ -37,6 +46,11 @@ const successMessage = ref('')
 const isSubmitting = ref(false)
 const showPassword = ref(false)
 const showDemoHint = ref(false)
+
+// Reset Password States
+const resetNewPassword = ref('')
+const resetConfirmPassword = ref('')
+const showResetPasswordToggle = ref(false)
 
 watch(() => props.initialTab, (val) => {
   if (val) tab.value = val
@@ -190,6 +204,72 @@ const handleResendOtp = async () => {
   }
 }
 
+const handleRequestResetOtp = async () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  if (!email.value.trim()) {
+    errorMessage.value = 'Silakan masukkan alamat email Anda.'
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    const res = await requestPasswordResetOtp(email.value)
+    if (res.success) {
+      tab.value = 'reset-password-otp'
+      startResendTimer()
+      otpDigits.value = ['', '', '', '', '', '']
+      successMessage.value = `Kode OTP reset kata sandi telah dikirimkan ke ${email.value}.`
+    } else {
+      errorMessage.value = res.message || 'Gagal mengirimkan kode OTP reset.'
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleResetPasswordWithOtp = async () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  const fullOtp = otpDigits.value.join('')
+  if (fullOtp.length < 6) {
+    errorMessage.value = 'Silakan masukkan 6 digit kode OTP verifikasi.'
+    return
+  }
+  if (!resetNewPassword.value || resetNewPassword.value.length < 6) {
+    errorMessage.value = 'Kata sandi baru minimal 6 karakter.'
+    return
+  }
+  if (resetNewPassword.value !== resetConfirmPassword.value) {
+    errorMessage.value = 'Konfirmasi kata sandi baru tidak cocok.'
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    const res = resetPasswordWithOtp({
+      email: email.value,
+      otpCode: fullOtp,
+      newPassword: resetNewPassword.value
+    })
+
+    if (res.success) {
+      password.value = resetNewPassword.value
+      successMessage.value = 'Kata sandi berhasil diubah! Membuka halaman login...'
+      try { playMascotChime() } catch (e) {}
+      setTimeout(() => {
+        switchTab('login')
+      }, 1200)
+    } else {
+      errorMessage.value = res.message || 'Gagal mereset kata sandi.'
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 const fillDemo = (demoEmail, demoPass) => {
   email.value = demoEmail
   password.value = demoPass
@@ -199,7 +279,7 @@ const fillDemo = (demoEmail, demoPass) => {
 
 <template>
   <div
-    class="min-h-[calc(100vh-4rem)] w-full flex items-center justify-center p-4 sm:p-6 lg:p-10 bg-[#F4F8FD] relative overflow-hidden"
+    class="min-h-screen w-full flex items-center justify-center pt-24 sm:pt-28 pb-10 px-4 sm:px-6 lg:px-10 bg-[#F4F8FD] relative overflow-hidden"
     style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
   >
     <!-- Background Ambient Glow Blobs -->
@@ -318,12 +398,12 @@ const fillDemo = (demoEmail, demoPass) => {
         <!-- Form Header -->
         <div class="text-left space-y-1.5 mb-6">
           <h1 class="text-2xl sm:text-3xl font-extrabold text-[#0F3261] tracking-tight">
-            {{ tab === 'login' ? 'Masuk ke Akunmu' : (tab === 'verify-otp' ? 'Verifikasi Email' : 'Buat Akun Inkluvia') }}
+            {{ tab === 'login' ? 'Masuk ke Akunmu' : (tab === 'verify-otp' ? 'Verifikasi Email' : (tab === 'forgot-password' || tab === 'reset-password-otp' ? 'Reset Kata Sandi' : 'Buat Akun Inkluvia')) }}
           </h1>
           <p class="text-xs sm:text-sm text-slate-500 font-medium">
             {{ tab === 'login'
               ? 'Silakan masuk untuk melanjutkan penjelajahan materi pembelajaran.'
-              : (tab === 'verify-otp' ? `Masukkan 6 digit kode OTP yang dikirimkan ke ${email}.` : 'Daftar sekarang untuk membuka akses penuh ke seluruh modul & fitur adaptif.') }}
+              : (tab === 'verify-otp' ? `Masukkan 6 digit kode OTP yang dikirimkan ke ${email}.` : (tab === 'forgot-password' || tab === 'reset-password-otp' ? 'Masukkan kode OTP dan kata sandi baru untuk akun Anda.' : 'Daftar sekarang untuk membuka akses penuh ke seluruh modul & fitur adaptif.')) }}
           </p>
         </div>
 
@@ -406,7 +486,16 @@ const fillDemo = (demoEmail, demoPass) => {
 
           <!-- Password -->
           <div class="space-y-1.5">
-            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Password</label>
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Password</label>
+              <button
+                type="button"
+                @click="switchTab('forgot-password')"
+                class="text-[11px] font-bold text-[#3587CE] hover:underline cursor-pointer"
+              >
+                Lupa Password?
+              </button>
+            </div>
             <div class="relative">
               <Lock class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -655,6 +744,117 @@ const fillDemo = (demoEmail, demoPass) => {
               Ubah Email / Kembali ke Pendaftaran
             </button>
           </div>
+        </div>
+
+        <!-- ================= FORM LUPA PASSWORD (REQUEST OTP) ================= -->
+        <div v-else-if="tab === 'forgot-password'" class="space-y-5 text-left">
+          <div class="p-4 rounded-2xl bg-blue-50/80 border border-blue-100 text-xs text-slate-600 font-medium leading-relaxed">
+            Masukkan alamat email terdaftar akun Anda. Kami akan mengirimkan 6 digit kode OTP verifikasi untuk mereset kata sandi Anda.
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Alamat Email Terdaftar</label>
+            <div class="relative">
+              <Mail class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                v-model="email"
+                type="email"
+                required
+                placeholder="email@contoh.com"
+                class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 focus:outline-none text-sm text-slate-800 transition"
+              />
+            </div>
+          </div>
+
+          <button
+            @click="handleRequestResetOtp"
+            :disabled="isSubmitting || !email.trim()"
+            class="w-full py-3.5 rounded-xl font-bold text-sm text-white transition active:scale-95 disabled:opacity-60 cursor-pointer shadow-lg flex items-center justify-center gap-2"
+            style="background: linear-gradient(135deg, #FF7315 0%, #e86105 100%);"
+          >
+            <span>{{ isSubmitting ? 'Mengirim OTP...' : 'Kirim Kode OTP Reset' }}</span>
+            <Send class="w-4 h-4" />
+          </button>
+
+          <p class="text-center text-xs text-slate-500 pt-1">
+            Kembali ke
+            <button type="button" @click="switchTab('login')" class="text-[#3587CE] font-bold hover:underline cursor-pointer ml-1">
+              Halaman Log In
+            </button>
+          </p>
+        </div>
+
+        <!-- ================= FORM RESET PASSWORD (INPUT OTP & PASSWORD BARU) ================= -->
+        <div v-else-if="tab === 'reset-password-otp'" class="space-y-4 text-left">
+          <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+            🔑 Masukkan 6 digit kode OTP yang dikirim ke <strong class="text-amber-950">{{ email }}</strong> dan buat kata sandi baru.
+          </div>
+
+          <!-- 6 Digit OTP Input -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide text-left">Kode OTP 6-Digit</label>
+            <div class="flex items-center justify-center gap-2" @paste="handleOtpPaste">
+              <input
+                v-for="(digit, idx) in otpDigits"
+                :key="idx"
+                v-model="otpDigits[idx]"
+                type="text"
+                maxlength="1"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                @input="handleDigitInput(idx, $event)"
+                @keydown="handleDigitKeyDown(idx, $event)"
+                class="w-10 h-12 text-center text-lg font-black text-[#0F3261] bg-slate-50 border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 focus:outline-none transition shadow-xs"
+              />
+            </div>
+          </div>
+
+          <!-- Password Baru -->
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Kata Sandi Baru</label>
+            <div class="relative">
+              <Lock class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                v-model="resetNewPassword"
+                :type="showResetPasswordToggle ? 'text' : 'password'"
+                required
+                placeholder="Minimal 6 karakter"
+                class="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 focus:outline-none text-sm text-slate-800 transition"
+              />
+              <button
+                type="button"
+                @click="showResetPasswordToggle = !showResetPasswordToggle"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <component :is="showResetPasswordToggle ? EyeOff : Eye" class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Konfirmasi Password Baru -->
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Konfirmasi Kata Sandi Baru</label>
+            <div class="relative">
+              <Lock class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                v-model="resetConfirmPassword"
+                :type="showResetPasswordToggle ? 'text' : 'password'"
+                required
+                placeholder="Ulangi kata sandi baru"
+                class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 focus:outline-none text-sm text-slate-800 transition"
+              />
+            </div>
+          </div>
+
+          <button
+            @click="handleResetPasswordWithOtp"
+            :disabled="isSubmitting || otpDigits.join('').length < 6 || !resetNewPassword"
+            class="w-full py-3.5 rounded-xl font-bold text-sm text-white transition active:scale-95 disabled:opacity-60 cursor-pointer shadow-lg mt-2 flex items-center justify-center gap-2"
+            style="background: linear-gradient(135deg, #0F3261 0%, #1e5fa8 100%);"
+          >
+            <span>{{ isSubmitting ? 'Menyimpan Password...' : 'Simpan Password Baru' }}</span>
+            <CheckCircle2 v-if="!isSubmitting" class="w-4 h-4" />
+          </button>
         </div>
 
       </div>

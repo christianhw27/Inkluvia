@@ -1,6 +1,15 @@
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
-import { currentUser, updateUserProfile, isAdmin, getProStatusInfo } from '../lib/authService'
+import {
+  currentUser,
+  updateUserProfile,
+  isAdmin,
+  getProStatusInfo,
+  changePassword,
+  requestEmailChangeOtp,
+  confirmEmailChangeWithOtp,
+  requestPasswordResetOtp
+} from '../lib/authService'
 import {
   ArrowLeft,
   User,
@@ -19,6 +28,7 @@ import {
   Coffee,
   Eye,
   Mail,
+  Lock,
   ChevronRight,
   Star,
   Trash2,
@@ -41,6 +51,168 @@ const emit = defineEmits(['back', 'navigate', 'logout', 'updated'])
 
 // Subscription & Account Status Info
 const proStatus = computed(() => getProStatusInfo(currentUser.value))
+
+// Change Password State
+const currentPasswordInput = ref('')
+const newPasswordInput = ref('')
+const confirmNewPasswordInput = ref('')
+const passwordChangeSuccess = ref('')
+const passwordChangeError = ref('')
+const isChangingPassword = ref(false)
+
+const handleChangePassword = async () => {
+  passwordChangeSuccess.value = ''
+  passwordChangeError.value = ''
+
+  if (!currentPasswordInput.value || !newPasswordInput.value || !confirmNewPasswordInput.value) {
+    passwordChangeError.value = 'Semua kolom kata sandi wajib diisi.'
+    return
+  }
+  if (newPasswordInput.value.length < 6) {
+    passwordChangeError.value = 'Kata sandi baru minimal 6 karakter.'
+    return
+  }
+  if (newPasswordInput.value !== confirmNewPasswordInput.value) {
+    passwordChangeError.value = 'Konfirmasi kata sandi baru tidak cocok.'
+    return
+  }
+
+  isChangingPassword.value = true
+  try {
+    const res = await changePassword({
+      currentPassword: currentPasswordInput.value,
+      newPassword: newPasswordInput.value
+    })
+
+    if (res.success) {
+      passwordChangeSuccess.value = res.message || 'Kata sandi berhasil diperbarui!'
+      currentPasswordInput.value = ''
+      newPasswordInput.value = ''
+      confirmNewPasswordInput.value = ''
+    } else {
+      passwordChangeError.value = res.message || 'Gagal mengubah kata sandi.'
+    }
+  } finally {
+    isChangingPassword.value = false
+  }
+}
+
+// Change Email Modal & OTP State
+const showEmailChangeModal = ref(false)
+const newEmailInput = ref('')
+const emailOtpDigits = ref(['', '', '', '', '', ''])
+const isEmailOtpSent = ref(false)
+const emailChangeSuccess = ref('')
+const emailChangeError = ref('')
+const isSubmittingEmailChange = ref(false)
+const emailResendTimer = ref(60)
+let emailTimerInterval = null
+
+const startEmailResendTimer = () => {
+  emailResendTimer.value = 60
+  if (emailTimerInterval) clearInterval(emailTimerInterval)
+  emailTimerInterval = setInterval(() => {
+    if (emailResendTimer.value > 0) {
+      emailResendTimer.value--
+    } else {
+      clearInterval(emailTimerInterval)
+    }
+  }, 1000)
+}
+
+const handleOpenEmailChangeModal = () => {
+  showEmailChangeModal.value = true
+  newEmailInput.value = ''
+  emailOtpDigits.value = ['', '', '', '', '', '']
+  isEmailOtpSent.value = false
+  emailChangeSuccess.value = ''
+  emailChangeError.value = ''
+}
+
+const handleSendEmailChangeOtp = async () => {
+  emailChangeError.value = ''
+  emailChangeSuccess.value = ''
+
+  if (!newEmailInput.value.trim()) {
+    emailChangeError.value = 'Silakan masukkan alamat email baru.'
+    return
+  }
+
+  isSubmittingEmailChange.value = true
+  try {
+    const res = await requestEmailChangeOtp(newEmailInput.value)
+    if (res.success) {
+      isEmailOtpSent.value = true
+      startEmailResendTimer()
+      emailChangeSuccess.value = `Kode verifikasi 6-digit telah dikirimkan ke ${newEmailInput.value}.`
+    } else {
+      emailChangeError.value = res.message || 'Gagal mengirimkan kode verifikasi.'
+    }
+  } finally {
+    isSubmittingEmailChange.value = false
+  }
+}
+
+const handleConfirmEmailChange = async () => {
+  emailChangeError.value = ''
+  emailChangeSuccess.value = ''
+
+  const fullOtp = emailOtpDigits.value.join('')
+  if (fullOtp.length < 6) {
+    emailChangeError.value = 'Masukkan 6 digit kode OTP verifikasi.'
+    return
+  }
+
+  isSubmittingEmailChange.value = true
+  try {
+    const res = confirmEmailChangeWithOtp({
+      newEmail: newEmailInput.value,
+      otpCode: fullOtp
+    })
+
+    if (res.success) {
+      emailChangeSuccess.value = res.message || 'Email berhasil diperbarui!'
+      setTimeout(() => {
+        showEmailChangeModal.value = false
+      }, 1500)
+    } else {
+      emailChangeError.value = res.message || 'Kode OTP tidak valid.'
+    }
+  } finally {
+    isSubmittingEmailChange.value = false
+  }
+}
+
+const handleEmailDigitInput = (index, event) => {
+  const val = event.target.value.replace(/[^0-9]/g, '')
+  emailOtpDigits.value[index] = val ? val.slice(-1) : ''
+
+  if (val && index < 5) {
+    const inputs = event.target.parentElement?.querySelectorAll('input')
+    if (inputs && inputs[index + 1]) {
+      inputs[index + 1].focus()
+    }
+  }
+}
+
+const handleEmailDigitKeyDown = (index, event) => {
+  if (event.key === 'Backspace' && !emailOtpDigits.value[index] && index > 0) {
+    const inputs = event.target.parentElement?.querySelectorAll('input')
+    if (inputs && inputs[index - 1]) {
+      inputs[index - 1].focus()
+    }
+  }
+}
+
+const handleEmailOtpPaste = (event) => {
+  event.preventDefault()
+  const pasted = (event.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '')
+  if (pasted) {
+    for (let i = 0; i < 6; i++) {
+      emailOtpDigits.value[i] = pasted[i] || ''
+    }
+  }
+}
 
 // Tab state: 'profile' | 'theme' | 'accessibility'
 const activeTab = ref(props.initialTab || 'profile')
@@ -839,19 +1011,28 @@ onMounted(async () => {
 
               <!-- Email Input (Full width, clean) -->
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
-                  Alamat Email (Akun)
-                </label>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Alamat Email (Akun)
+                  </label>
+                  <button
+                    type="button"
+                    @click="handleOpenEmailChangeModal"
+                    class="text-xs font-bold text-[#3587CE] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>✉️ Ubah Email Akun</span>
+                  </button>
+                </div>
                 <div class="relative">
                   <Mail class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     :value="currentUser?.email || 'Belum masuk'"
                     type="email"
                     disabled
-                    class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-100/90 text-sm font-medium text-slate-500 cursor-not-allowed outline-none"
+                    class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-100/90 text-sm font-semibold text-slate-700 cursor-not-allowed outline-none"
                   />
                 </div>
-                <span class="text-[11px] text-slate-400 mt-1 block">Email terikat permanen dengan akun.</span>
+                <span class="text-[11px] text-slate-400 mt-1 block">Klik "Ubah Email Akun" jika ingin mengganti email melalui verifikasi OTP.</span>
               </div>
             </div>
 
@@ -868,6 +1049,114 @@ onMounted(async () => {
                 <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan Profil' }}</span>
               </button>
             </div>
+          </div>
+
+          <!-- SUB-CARD: KEAMANAN & GANTI KATA SANDI -->
+          <div
+            v-if="activeTab === 'profile'"
+            class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-6 animate-slide-up"
+          >
+            <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-black text-[#0F3261] flex items-center gap-2">
+                  <Lock class="w-5 h-5 text-[#FF7315]" />
+                  <span>Keamanan & Ganti Kata Sandi</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Perbarui kata sandi Anda secara berkala untuk menjaga keamanan akun Inkluvia.
+                </p>
+              </div>
+            </div>
+
+            <!-- Password Change Success Alert -->
+            <div
+              v-if="passwordChangeSuccess"
+              class="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold"
+            >
+              <CheckCircle2 class="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{{ passwordChangeSuccess }}</span>
+            </div>
+
+            <!-- Password Change Error Alert -->
+            <div
+              v-if="passwordChangeError"
+              class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-semibold"
+            >
+              {{ passwordChangeError }}
+            </div>
+
+            <form @submit.prevent="handleChangePassword" class="space-y-4">
+              <!-- Sandi Saat Ini -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                  Kata Sandi Saat Ini
+                </label>
+                <div class="relative">
+                  <Lock class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    v-model="currentPasswordInput"
+                    type="password"
+                    required
+                    placeholder="Masukkan kata sandi saat ini"
+                    class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-semibold text-slate-800 outline-none transition bg-white"
+                  />
+                </div>
+              </div>
+
+              <!-- Sandi Baru & Konfirmasi -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                    Kata Sandi Baru
+                  </label>
+                  <div class="relative">
+                    <Lock class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      v-model="newPasswordInput"
+                      type="password"
+                      required
+                      placeholder="Min. 6 karakter"
+                      class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-semibold text-slate-800 outline-none transition bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                    Konfirmasi Sandi Baru
+                  </label>
+                  <div class="relative">
+                    <Lock class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      v-model="confirmNewPasswordInput"
+                      type="password"
+                      required
+                      placeholder="Ulangi sandi baru"
+                      class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-semibold text-slate-800 outline-none transition bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  @click="emit('navigate', 'auth')"
+                  class="text-xs font-bold text-[#3587CE] hover:underline cursor-pointer"
+                >
+                  Lupa password saat ini? Reset via OTP Email
+                </button>
+
+                <button
+                  type="submit"
+                  :disabled="isChangingPassword"
+                  class="w-full sm:w-auto py-3 px-6 rounded-2xl bg-[#0F3261] hover:bg-[#194784] text-white font-extrabold text-xs transition active:scale-95 shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Check class="w-4 h-4" />
+                  <span>{{ isChangingPassword ? 'Memperbarui...' : 'Simpan Kata Sandi Baru' }}</span>
+                </button>
+              </div>
+            </form>
           </div>
 
           <!-- TAB 2: TEMA TAMPILAN -->
@@ -1383,6 +1672,129 @@ onMounted(async () => {
               Ya, Hapus
             </button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ================= EMAIL CHANGE OTP MODAL ================= -->
+    <Teleport to="body">
+      <div
+        v-if="showEmailChangeModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        @click.self="showEmailChangeModal = false"
+      >
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 animate-slide-up space-y-5 relative">
+          <!-- Header -->
+          <div class="text-center space-y-2">
+            <div class="w-14 h-14 rounded-2xl bg-blue-50 text-[#3587CE] flex items-center justify-center text-2xl mx-auto shadow-inner">
+              <Mail class="w-7 h-7" />
+            </div>
+            <h3 class="text-xl font-black text-[#0F3261]">Ubah Alamat Email Akun</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Email lama Anda saat ini adalah <strong class="text-slate-700">{{ currentUser?.email }}</strong>. Masukkan alamat email baru untuk mendapatkan kode verifikasi.
+            </p>
+          </div>
+
+          <!-- Alert Success -->
+          <div v-if="emailChangeSuccess" class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+            <CheckCircle2 class="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{{ emailChangeSuccess }}</span>
+          </div>
+
+          <!-- Alert Error -->
+          <div v-if="emailChangeError" class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+            {{ emailChangeError }}
+          </div>
+
+          <!-- Step 1: Input Email Baru -->
+          <form v-if="!isEmailOtpSent" @submit.prevent="handleSendEmailChangeOtp" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
+                Alamat Email Baru
+              </label>
+              <div class="relative">
+                <Mail class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  v-model="newEmailInput"
+                  type="email"
+                  required
+                  placeholder="Contoh: emailbaru@domain.com"
+                  class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-sm font-semibold text-slate-800 outline-none transition bg-white"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                @click="showEmailChangeModal = false"
+                class="py-3 px-4 rounded-2xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                :disabled="isSubmittingEmailChange"
+                class="py-3 px-4 rounded-2xl bg-[#0F3261] hover:bg-[#194784] text-xs font-bold text-white transition cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <span>{{ isSubmittingEmailChange ? 'Mengirim...' : 'Kirim Kode OTP' }}</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Step 2: Input OTP 6-Digit -->
+          <form v-else @submit.prevent="handleConfirmEmailChange" class="space-y-4">
+            <div class="space-y-2">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide text-center">
+                Masukkan 6-Digit Kode Verifikasi OTP
+              </label>
+              
+              <!-- 6 Digit Input Boxes -->
+              <div class="flex items-center justify-center gap-2" @paste="handleEmailOtpPaste">
+                <input
+                  v-for="(digit, idx) in emailOtpDigits"
+                  :key="idx"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  :value="digit"
+                  @input="handleEmailDigitInput(idx, $event)"
+                  @keydown="handleEmailDigitKeyDown(idx, $event)"
+                  class="w-11 h-13 text-center text-xl font-black rounded-xl border-2 border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-[#0F3261] bg-slate-50 outline-none transition"
+                />
+              </div>
+            </div>
+
+            <!-- Resend Timer CTA -->
+            <div class="text-center pt-1">
+              <button
+                type="button"
+                @click="handleSendEmailChangeOtp"
+                :disabled="emailResendTimer > 0 || isSubmittingEmailChange"
+                class="text-xs font-bold text-[#3587CE] disabled:text-slate-400 hover:underline cursor-pointer disabled:cursor-not-allowed"
+              >
+                <span v-if="emailResendTimer > 0">Kirim ulang OTP dalam ({{ emailResendTimer }}s)</span>
+                <span v-else>Belum menerima kode? Kirim Ulang OTP</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                @click="isEmailOtpSent = false"
+                class="py-3 px-4 rounded-2xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Ganti Email
+              </button>
+              <button
+                type="submit"
+                :disabled="isSubmittingEmailChange"
+                class="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <span>{{ isSubmittingEmailChange ? 'Verifikasi...' : 'Verifikasi & Simpan Email' }}</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </Teleport>

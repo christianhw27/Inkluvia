@@ -171,12 +171,12 @@ const handleToggleSound = () => {
   soundActive.value = toggleSound()
 }
 
-// Interactive Mascot Si Es Batu state
+// Interactive Mascot Si Inklu state
 const mascotQuips = [
-  'Hai! Aku Si Es Batu 🧊 Siap bertualang bersamaku hari ini?',
-  'Tahukah kamu, air es bisa berubah jadi uap kalau dipanaskan! 💧✨',
+  'Hai! Aku Si Inklu 🌟 Siap bertualang bersamaku hari ini?',
+  'Tahukah kamu, belajar dengan gaya adaptif membuat otakmu makin cerdas! 💡✨',
   'Kamu suka belajar dengan Standard Mode atau Focus Mode? Keduanya asyik! 🎒',
-  'Brrr! Dingin tapi seru! Klik aku lagi untuk fakta sains lainnya! 🌟'
+  'Semangat terus ya! Klik aku lagi untuk fakta sains & tips belajar seru lainnya! 🌟'
 ]
 const currentQuipIndex = ref(0)
 const isMascotSpeaking = ref(false)
@@ -961,13 +961,6 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   <span>Mulai Belajar</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>
-                <button
-                  @click="navigateTo('materi'); playButtonPop()"
-                  class="px-7 py-3.5 rounded-full bg-white hover:bg-slate-50 text-[#0F3261] font-extrabold text-sm border-2 border-[#0F3261] flex items-center gap-2.5 transition active:scale-95 cursor-pointer shadow-2xs"
-                >
-                  <Play class="w-4 h-4 fill-[#0F3261] text-[#0F3261]" />
-                  <span>Jelajahi Materi</span>
-                </button>
               </div>
 
             </div>
@@ -1008,8 +1001,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   <DoodleOrnament name="burst" color="#3DA5FF" :size="34" />
                 </div>
 
-                <!-- Cute & Friendly Mascot Speech Pill Badge (Positioned directly over Si Es Batu's head) -->
-                <div class="pointer-events-auto absolute top-[14%] sm:top-[16%] left-[58%] sm:left-[59%] -translate-x-1/2 z-30">
+                <!-- Cute & Friendly Mascot Speech Pill Badge (Positioned naturally above the boy character) -->
+                <div class="pointer-events-auto absolute top-[22%] sm:top-[24%] left-[54%] sm:left-[55%] -translate-x-1/2 z-30">
                   <div class="relative flex flex-col items-center">
                     <!-- Active Mascot Speech Dialog Box (when clicked) -->
                     <Transition name="bubble">
@@ -1029,9 +1022,9 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                       class="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full bg-white hover:bg-sky-50 text-[#0F3261] hover:text-[#FF7315] font-black text-xs sm:text-sm shadow-xl shadow-[#3DA5FF]/20 border-2 border-[#3DA5FF] hover:border-[#FF7315] flex items-center gap-2 transition-all duration-200 active:scale-95 cursor-pointer select-none whitespace-nowrap relative group"
                       :class="{ 'animate-wiggle': isMascotWiggling }"
                     >
-                      <span class="text-base group-hover:rotate-12 transition-transform">🧊</span>
-                      <span>Halo Si Es Batu! ✨</span>
-                      <!-- Little Speech Stem pointing down to mascot -->
+                      <span class="text-base group-hover:rotate-12 transition-transform">🌟</span>
+                      <span>Halo Si Inklu! ✨</span>
+                      <!-- Little Speech Stem pointing down -->
                       <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-x-6 border-x-transparent border-t-6 border-t-[#3DA5FF] group-hover:border-t-[#FF7315] transition-colors"></div>
                     </button>
                   </div>
@@ -1039,7 +1032,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <img
                   src="/Banner_Dashboard2.jpg"
-                  alt="Anak-anak belajar bersama Si Es Batu"
+                  alt="Anak-anak belajar bersama Inkluvia"
                   class="w-full max-w-[720px] xl:max-w-[800px] h-auto object-contain select-none pointer-events-none block rounded-3xl"
                   style="mix-blend-mode: multiply;"
                 />
@@ -1087,8 +1080,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </p>
           </div>
 
-          <!-- 4 Feature Cards Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <!-- 3 Feature Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <!-- Card 1: Multi-Sensori -->
             <div class="bg-white rounded-3xl p-6 border border-orange-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-100">
@@ -1114,31 +1107,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </div>
             </div>
 
-            <!-- Card 2: Tipografi Ramah Baca & Disleksia -->
-            <div class="bg-white rounded-3xl p-6 border border-blue-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-200">
-              <div class="space-y-4">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-[#3DA5FF] text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
-                  <Type class="w-7 h-7" />
-                </div>
-                <h3 class="text-lg font-extrabold text-[#0F3261]">Tipografi Ramah Disleksia</h3>
-                <p class="text-xs text-slate-500 font-medium leading-relaxed" :class="{ 'tracking-wider font-mono': isDyslexiaDemoActive }">
-                  {{ isDyslexiaDemoActive ? 'P a n d u a n   t e k s   d e n g a n   s p a s i   l a p a n g   d a n   j e l a s.' : 'Pilihan jenis huruf yang dirancang khusus untuk mengurangi kebingungan huruf serupa serta ukuran teks yang mudah dibaca.' }}
-                </p>
-              </div>
-
-              <!-- Interactive Toggle Demo -->
-              <div class="pt-5 mt-4 border-t border-slate-100">
-                <button
-                  @click="isDyslexiaDemoActive = !isDyslexiaDemoActive"
-                  class="w-full py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#3587CE] text-xs font-extrabold flex items-center justify-center gap-2 transition cursor-pointer"
-                >
-                  <span>{{ isDyslexiaDemoActive ? 'Tampilan: Ramah Disleksia ✓' : 'Coba Demo Mode Font ⇄' }}</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Card 3: Zero-Pressure Pace -->
-            <div class="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-300">
+            <!-- Card 2: Zero-Pressure Pace -->
+            <div class="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-200">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-400 to-[#E1529C] text-white flex items-center justify-center shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform">
                   <Clock class="w-7 h-7" />
@@ -1155,8 +1125,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </div>
             </div>
 
-            <!-- Card 4: Aman & Bebas Iklan -->
-            <div class="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-400">
+            <!-- Card 3: Aman & Bebas Iklan -->
+            <div class="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-300">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-[#54AA1B] text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
                   <ShieldCheck class="w-7 h-7" />
@@ -1397,7 +1367,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </div>
               <div class="flex items-center gap-2.5">
                 <CheckCircle2 class="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Kuis Interaktif & Lencana Stiker Si Es Batu</span>
+                <span>Kuis Interaktif & Lencana Stiker Inkluvia</span>
               </div>
             </div>
 
@@ -2157,11 +2127,11 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <div class="mb-12 p-6 sm:p-8 rounded-3xl bg-white/06 border border-white/10 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-6">
           <div class="flex items-center gap-4 text-center md:text-left">
             <div class="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-3xl shadow-inner shrink-0">
-              🧊
+              🌟
             </div>
             <div>
               <h4 class="text-base sm:text-lg font-black text-white">
-                Siap Menjelajah Bersama Si Es Batu?
+                Siap Menjelajah Bersama Inkluvia?
               </h4>
               <p class="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
                 Pilih gaya belajarmu hari ini. Ada Standar, Slow, Kontras Tinggi, dan Fokus Mandiri!

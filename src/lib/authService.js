@@ -8,7 +8,7 @@ import {
   removeStoredToken,
   JWT_STORAGE_KEY
 } from './jwtHelper'
-import { sendOtpEmail } from './emailService'
+import { sendOtpEmail, sendPasswordResetEmail, sendEmailChangeOtp } from './emailService'
 
 const LEGACY_STORAGE_KEY = 'inkluvia_auth_session_v2'
 
@@ -769,6 +769,242 @@ export function verifyEmailOtp(email, inputOtp) {
   } catch (e) {
     console.error('Error verifying OTP:', e)
     return { success: false, message: 'Gagal memverifikasi kode OTP.' }
+  }
+}
+
+/**
+ * Helper untuk mengambil password tersimpan atau demo password
+ */
+function getUserPassword(email) {
+  const cleanEmail = (email || '').toLowerCase()
+  const customPasswords = JSON.parse(localStorage.getItem('inkluvia_user_passwords') || '{}')
+  if (customPasswords[cleanEmail]) {
+    return customPasswords[cleanEmail]
+  }
+  const demoMatch = DEMO_ACCOUNTS.find(a => a.email.toLowerCase() === cleanEmail)
+  if (demoMatch) return demoMatch.password
+  return 'user123'
+}
+
+/**
+ * Ganti Password (membutuhkan password saat ini)
+ */
+export async function changePassword({ currentPassword, newPassword }) {
+  if (!currentUser.value) {
+    return { success: false, message: 'Anda harus log in terlebih dahulu.' }
+  }
+
+  const email = (currentUser.value.email || '').toLowerCase()
+  const actualPassword = getUserPassword(email)
+
+  if (currentPassword !== actualPassword) {
+    return { success: false, message: 'Kata sandi saat ini tidak cocok. Silakan coba lagi.' }
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, message: 'Kata sandi baru minimal 6 karakter.' }
+  }
+
+  // Simpan password baru
+  try {
+    const customPasswords = JSON.parse(localStorage.getItem('inkluvia_user_passwords') || '{}')
+    customPasswords[email] = newPassword
+    localStorage.setItem('inkluvia_user_passwords', JSON.stringify(customPasswords))
+  } catch (e) {
+    console.error('Failed to update password:', e)
+  }
+
+  // Update Supabase jika aktif
+  if (isSupabaseConfigured && currentUser.value.isSupabase) {
+    try {
+      await supabase.auth.updateUser({ password: newPassword })
+    } catch (e) {
+      console.warn('Supabase password update failed (non-critical):', e)
+    }
+  }
+
+  return { success: true, message: 'Kata sandi berhasil diperbarui!' }
+}
+
+/**
+ * Meminta OTP Reset Password (Lupa Sandi)
+ */
+export async function requestPasswordResetOtp(email) {
+  const cleanEmail = (email || '').trim().toLowerCase()
+  if (!cleanEmail) {
+    return { success: false, message: 'Alamat email wajib diisi.' }
+  }
+
+  const otpCode = generateOtpCode()
+  const expiresAt = Date.now() + 10 * 60 * 1000
+
+  try {
+    const resets = JSON.parse(localStorage.getItem('inkluvia_pending_resets') || '{}')
+    resets[cleanEmail] = {
+      code: otpCode,
+      expiresAt,
+      createdAt: Date.now()
+    }
+    localStorage.setItem('inkluvia_pending_resets', JSON.stringify(resets))
+  } catch (e) {
+    console.error('Failed to save reset OTP:', e)
+  }
+
+  const emailRes = await sendPasswordResetEmail({
+    toEmail: cleanEmail,
+    userName: cleanEmail.split('@')[0],
+    otpCode
+  })
+
+  return {
+    success: true,
+    otpCode,
+    expiresAt,
+    message: emailRes.message || 'Kode OTP reset password telah dikirimkan ke email Anda.'
+  }
+}
+
+/**
+ * Mereset Password menggunakan OTP
+ */
+export function resetPasswordWithOtp({ email, otpCode, newPassword }) {
+  const cleanEmail = (email || '').trim().toLowerCase()
+  const cleanOtp = (otpCode || '').toString().trim().replace(/[^0-9]/g, '')
+
+  if (!cleanEmail || !cleanOtp || !newPassword) {
+    return { success: false, message: 'Semua field wajib diisi.' }
+  }
+
+  if (newPassword.length < 6) {
+    return { success: false, message: 'Password baru minimal 6 karakter.' }
+  }
+
+  try {
+    const resets = JSON.parse(localStorage.getItem('inkluvia_pending_resets') || '{}')
+    const record = resets[cleanEmail]
+
+    if (!record) {
+      return { success: false, message: 'Kode OTP reset password tidak ditemukan atau telah kadaluarsa.' }
+    }
+
+    if (Date.now() > record.expiresAt) {
+      delete resets[cleanEmail]
+      localStorage.setItem('inkluvia_pending_resets', JSON.stringify(resets))
+      return { success: false, message: 'Kode OTP telah kadaluarsa. Silakan minta kode baru.' }
+    }
+
+    if (record.code !== cleanOtp) {
+      return { success: false, message: 'Kode OTP yang Anda masukkan salah. Periksa kembali.' }
+    }
+
+    // UPDATE PASSWORD
+    delete resets[cleanEmail]
+    localStorage.setItem('inkluvia_pending_resets', JSON.stringify(resets))
+
+    const customPasswords = JSON.parse(localStorage.getItem('inkluvia_user_passwords') || '{}')
+    customPasswords[cleanEmail] = newPassword
+    localStorage.setItem('inkluvia_user_passwords', JSON.stringify(customPasswords))
+
+    return { success: true, message: 'Password Anda telah berhasil diperbarui! Silakan masuk dengan password baru.' }
+  } catch (e) {
+    console.error('Error resetting password with OTP:', e)
+    return { success: false, message: 'Gagal mereset password.' }
+  }
+}
+
+/**
+ * Meminta OTP Ganti Email
+ */
+export async function requestEmailChangeOtp(newEmail) {
+  const cleanNewEmail = (newEmail || '').trim().toLowerCase()
+  if (!currentUser.value) {
+    return { success: false, message: 'Anda harus log in terlebih dahulu.' }
+  }
+  if (!cleanNewEmail) {
+    return { success: false, message: 'Alamat email baru wajib diisi.' }
+  }
+  if (cleanNewEmail === (currentUser.value.email || '').toLowerCase()) {
+    return { success: false, message: 'Email baru sama dengan email saat ini.' }
+  }
+
+  const otpCode = generateOtpCode()
+  const expiresAt = Date.now() + 10 * 60 * 1000
+
+  try {
+    const changes = JSON.parse(localStorage.getItem('inkluvia_pending_email_changes') || '{}')
+    changes[cleanNewEmail] = {
+      oldEmail: currentUser.value.email,
+      newEmail: cleanNewEmail,
+      code: otpCode,
+      expiresAt,
+      createdAt: Date.now()
+    }
+    localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
+  } catch (e) {
+    console.error('Failed to save email change OTP:', e)
+  }
+
+  const emailRes = await sendEmailChangeOtp({
+    toEmail: cleanNewEmail,
+    userName: currentUser.value.name,
+    otpCode
+  })
+
+  return {
+    success: true,
+    otpCode,
+    expiresAt,
+    message: emailRes.message || 'Kode OTP verifikasi telah dikirimkan ke email baru Anda.'
+  }
+}
+
+/**
+ * Mengonfirmasi Ganti Email dengan OTP
+ */
+export function confirmEmailChangeWithOtp({ newEmail, otpCode }) {
+  const cleanNewEmail = (newEmail || '').trim().toLowerCase()
+  const cleanOtp = (otpCode || '').toString().trim().replace(/[^0-9]/g, '')
+
+  if (!currentUser.value) {
+    return { success: false, message: 'Anda harus log in terlebih dahulu.' }
+  }
+
+  try {
+    const changes = JSON.parse(localStorage.getItem('inkluvia_pending_email_changes') || '{}')
+    const record = changes[cleanNewEmail]
+
+    if (!record) {
+      return { success: false, message: 'Kode OTP ganti email tidak ditemukan atau telah kadaluarsa.' }
+    }
+
+    if (Date.now() > record.expiresAt) {
+      delete changes[cleanNewEmail]
+      localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
+      return { success: false, message: 'Kode OTP telah kadaluarsa. Silakan minta kode baru.' }
+    }
+
+    if (record.code !== cleanOtp) {
+      return { success: false, message: 'Kode OTP yang Anda masukkan salah.' }
+    }
+
+    // UPDATE EMAIL IN USER SESSION
+    delete changes[cleanNewEmail]
+    localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
+
+    currentUser.value.email = cleanNewEmail
+    currentUser.value.isEmailVerified = true
+
+    // Mark new email verified
+    const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
+    verifiedRegistry[cleanNewEmail] = true
+    localStorage.setItem('inkluvia_verified_emails', JSON.stringify(verifiedRegistry))
+
+    saveUserSession(currentUser.value)
+
+    return { success: true, message: `Alamat email berhasil diperbarui ke ${cleanNewEmail}!` }
+  } catch (e) {
+    console.error('Error confirming email change:', e)
+    return { success: false, message: 'Gagal memperbarui alamat email.' }
   }
 }
 
