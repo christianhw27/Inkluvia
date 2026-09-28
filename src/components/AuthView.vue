@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { loginUser, registerUser } from '../lib/authService'
+import { loginUser, registerUser, requestEmailVerificationOtp, verifyEmailOtp, currentUser } from '../lib/authService'
+import { playMascotChime } from '../lib/soundEffects'
 import {
   Mail,
   Lock,
@@ -15,7 +15,8 @@ import {
   Target,
   Accessibility,
   Gamepad2,
-  ArrowRight
+  ArrowRight,
+  Send
 } from '@lucide/vue'
 import DoodleOrnament from './DoodleOrnament.vue'
 
@@ -45,6 +46,54 @@ const switchTab = (t) => {
   tab.value = t
   errorMessage.value = ''
   successMessage.value = ''
+}
+
+// OTP Verification States
+const otpDigits = ref(['', '', '', '', '', ''])
+const resendTimer = ref(60)
+let timerInterval = null
+
+const startResendTimer = () => {
+  resendTimer.value = 60
+  if (timerInterval) clearInterval(timerInterval)
+  timerInterval = setInterval(() => {
+    if (resendTimer.value > 0) {
+      resendTimer.value--
+    } else {
+      clearInterval(timerInterval)
+    }
+  }, 1000)
+}
+
+const handleDigitInput = (index, event) => {
+  const val = event.target.value.replace(/[^0-9]/g, '')
+  otpDigits.value[index] = val ? val.slice(-1) : ''
+
+  if (val && index < 5) {
+    const inputs = event.target.form?.querySelectorAll('input[type="text"]') || event.target.parentElement?.querySelectorAll('input')
+    if (inputs && inputs[index + 1]) {
+      inputs[index + 1].focus()
+    }
+  }
+}
+
+const handleDigitKeyDown = (index, event) => {
+  if (event.key === 'Backspace' && !otpDigits.value[index] && index > 0) {
+    const inputs = event.target.parentElement?.querySelectorAll('input')
+    if (inputs && inputs[index - 1]) {
+      inputs[index - 1].focus()
+    }
+  }
+}
+
+const handleOtpPaste = (event) => {
+  event.preventDefault()
+  const pasted = (event.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '')
+  if (pasted) {
+    for (let i = 0; i < 6; i++) {
+      otpDigits.value[i] = pasted[i] || ''
+    }
+  }
 }
 
 const handleLogin = async () => {
@@ -85,9 +134,56 @@ const handleRegister = async () => {
       role: role.value
     })
     if (res.success) {
-      emit('authenticated', res.user)
+      tab.value = 'verify-otp'
+      startResendTimer()
+      successMessage.value = `Kode verifikasi 6 digit telah dikirimkan ke ${email.value}.`
     } else {
       errorMessage.value = res.message || 'Pendaftaran gagal.'
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleVerifyOtp = async () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+  const fullOtp = otpDigits.value.join('')
+
+  if (fullOtp.length < 6) {
+    errorMessage.value = 'Silakan masukkan 6 digit kode OTP verifikasi.'
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    const res = verifyEmailOtp(email.value, fullOtp)
+    if (res.success) {
+      successMessage.value = 'Verifikasi email berhasil! Selamat datang di Inkluvia.'
+      try { playMascotChime() } catch (e) {}
+      setTimeout(() => {
+        emit('authenticated', currentUser.value)
+      }, 900)
+    } else {
+      errorMessage.value = res.message || 'Kode OTP yang Anda masukkan tidak valid.'
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleResendOtp = async () => {
+  if (resendTimer.value > 0) return
+  errorMessage.value = ''
+  successMessage.value = ''
+  isSubmitting.value = true
+  try {
+    const res = await requestEmailVerificationOtp(email.value, name.value)
+    if (res.success) {
+      successMessage.value = 'Kode OTP baru telah dikirimkan ke email Anda!'
+      startResendTimer()
+    } else {
+      errorMessage.value = res.message || 'Gagal mengirim ulang kode OTP.'
     }
   } finally {
     isSubmitting.value = false
@@ -222,12 +318,12 @@ const fillDemo = (demoEmail, demoPass) => {
         <!-- Form Header -->
         <div class="text-left space-y-1.5 mb-6">
           <h1 class="text-2xl sm:text-3xl font-extrabold text-[#0F3261] tracking-tight">
-            {{ tab === 'login' ? 'Masuk ke Akunmu' : 'Buat Akun Inkluvia' }}
+            {{ tab === 'login' ? 'Masuk ke Akunmu' : (tab === 'verify-otp' ? 'Verifikasi Email' : 'Buat Akun Inkluvia') }}
           </h1>
           <p class="text-xs sm:text-sm text-slate-500 font-medium">
             {{ tab === 'login'
               ? 'Silakan masuk untuk melanjutkan penjelajahan materi pembelajaran.'
-              : 'Daftar sekarang untuk membuka akses penuh ke seluruh modul & fitur adaptif.' }}
+              : (tab === 'verify-otp' ? `Masukkan 6 digit kode OTP yang dikirimkan ke ${email}.` : 'Daftar sekarang untuk membuka akses penuh ke seluruh modul & fitur adaptif.') }}
           </p>
         </div>
 
@@ -392,7 +488,7 @@ const fillDemo = (demoEmail, demoPass) => {
         </form>
 
         <!-- ================= FORM REGISTER ================= -->
-        <form v-else @submit.prevent="handleRegister" class="space-y-4 text-left">
+        <form v-else-if="tab === 'register'" @submit.prevent="handleRegister" class="space-y-4 text-left">
           <!-- Nama Lengkap -->
           <div class="space-y-1.5">
             <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Nama Lengkap</label>
@@ -495,6 +591,71 @@ const fillDemo = (demoEmail, demoPass) => {
             </button>
           </p>
         </form>
+
+        <!-- ================= FORM VERIFIKASI OTP ================= -->
+        <div v-else-if="tab === 'verify-otp'" class="space-y-6 text-center pt-2">
+          <div class="w-16 h-16 rounded-2xl bg-blue-50 border-2 border-blue-200 text-[#3DA5FF] flex items-center justify-center mx-auto text-3xl shadow-inner">
+            📩
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="text-lg sm:text-xl font-black text-[#0F3261]">
+              Cek Kotak Masuk Email Anda
+            </h3>
+            <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-sm mx-auto">
+              Kode verifikasi 6 digit telah dikirimkan ke alamat email <strong class="text-[#0F3261] font-extrabold">{{ email }}</strong> via Resend API.
+            </p>
+          </div>
+
+          <!-- 6-Digit OTP Box Inputs -->
+          <div class="flex items-center justify-center gap-2 sm:gap-3 my-4" @paste="handleOtpPaste">
+            <input
+              v-for="(digit, idx) in otpDigits"
+              :key="idx"
+              v-model="otpDigits[idx]"
+              type="text"
+              maxlength="1"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              @input="handleDigitInput(idx, $event)"
+              @keydown="handleDigitKeyDown(idx, $event)"
+              class="w-11 h-13 sm:w-13 sm:h-15 text-center text-xl sm:text-2xl font-black text-[#0F3261] bg-slate-50 border-2 border-slate-200 rounded-2xl focus:bg-white focus:border-[#3DA5FF] focus:ring-4 focus:ring-[#3DA5FF]/20 focus:outline-none transition-all duration-200 shadow-xs"
+            />
+          </div>
+
+          <!-- Submit Button -->
+          <button
+            @click="handleVerifyOtp"
+            :disabled="isSubmitting || otpDigits.join('').length < 6"
+            class="w-full py-3.5 rounded-xl font-extrabold text-sm text-white transition active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg flex items-center justify-center gap-2"
+            style="background: linear-gradient(135deg, #FF7315 0%, #e86105 100%); shadow: 0 4px 16px rgba(255,115,21,0.35);"
+          >
+            <span>{{ isSubmitting ? 'Memverifikasi...' : 'Verifikasi & Masuk Akun' }}</span>
+            <CheckCircle2 v-if="!isSubmitting" class="w-4 h-4" />
+          </button>
+
+          <!-- Resend Timer & Resend Link -->
+          <div class="text-xs font-semibold text-slate-500 pt-2 space-y-2">
+            <p class="flex items-center justify-center gap-1">
+              <span>Tidak menerima kode?</span>
+              <button
+                type="button"
+                @click="handleResendOtp"
+                :disabled="resendTimer > 0 || isSubmitting"
+                class="font-black text-[#3587CE] hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {{ resendTimer > 0 ? `Kirim Ulang (${resendTimer}s)` : 'Kirim Ulang Kode' }}
+              </button>
+            </p>
+            <button
+              type="button"
+              @click="switchTab('register')"
+              class="text-slate-400 hover:text-slate-600 underline text-[11px] block mx-auto cursor-pointer"
+            >
+              Ubah Email / Kembali ke Pendaftaran
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>

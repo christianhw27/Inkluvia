@@ -8,6 +8,7 @@ import {
   removeStoredToken,
   JWT_STORAGE_KEY
 } from './jwtHelper'
+import { sendOtpEmail } from './emailService'
 
 const LEGACY_STORAGE_KEY = 'inkluvia_auth_session_v2'
 
@@ -51,11 +52,20 @@ function loadUserSession() {
         const meta = payload.user_metadata || {}
         const email = (payload.email || '').toLowerCase()
         const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+        const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
         const subscriber = proRegistry[email] || {}
         const isAdminUser = payload.role === 'admin' || meta.role === 'admin' || email.includes('admin')
         
         let isPro = Boolean(payload.isPro || meta.is_pro || subscriber.isPro || isAdminUser)
         let proExpiresAt = subscriber.expiresAt || payload.proExpiresAt || meta.pro_expires_at || null
+        const isEmailVerified = Boolean(
+          payload.isEmailVerified ||
+          meta.email_verified ||
+          verifiedRegistry[email] ||
+          isAdminUser ||
+          email.includes('@inkluvia.id') ||
+          email === 'siswa@gmail.com'
+        )
 
         // Check or initialize expiration date for non-admin PRO users
         if (isPro && !isAdminUser) {
@@ -86,6 +96,7 @@ function loadUserSession() {
           tier: isPro ? 'pro' : 'free',
           proPlanName: subscriber.planName || payload.proPlanName || (isPro ? 'Inkluvia Premium PRO' : null),
           proExpiresAt,
+          isEmailVerified,
           token,
           isSupabase: Boolean(payload.iss && payload.iss.includes('supabase'))
         }
@@ -318,7 +329,8 @@ export async function registerUser({ name, email, password, role = 'user' }) {
         name: cleanName,
         email: cleanEmail,
         role: role,
-        avatar: role === 'admin' ? '🛡️' : '👧'
+        avatar: role === 'admin' ? '🛡️' : '👧',
+        isEmailVerified: false
       })
 
       const newUser = {
@@ -327,12 +339,17 @@ export async function registerUser({ name, email, password, role = 'user' }) {
         email: cleanEmail,
         role: role,
         avatar: role === 'admin' ? '🛡️' : '👧',
+        isEmailVerified: false,
         token,
         isSupabase: true
       }
       currentUser.value = newUser
       saveUserSession(newUser, token)
-      return { success: true, user: newUser, token }
+
+      // Kirim email OTP verifikasi
+      await requestEmailVerificationOtp(cleanEmail, cleanName)
+
+      return { success: true, user: newUser, token, requiresOtp: true }
     } catch (err) {
       return { success: false, message: err.message || 'Pendaftaran gagal. Coba lagi.' }
     }
@@ -344,7 +361,8 @@ export async function registerUser({ name, email, password, role = 'user' }) {
     name: cleanName,
     email: cleanEmail,
     role: role,
-    avatar: role === 'admin' ? '🛡️' : '👧'
+    avatar: role === 'admin' ? '🛡️' : '👧',
+    isEmailVerified: false
   })
 
   const newUser = {
@@ -353,12 +371,17 @@ export async function registerUser({ name, email, password, role = 'user' }) {
     email: cleanEmail,
     role: role,
     avatar: role === 'admin' ? '🛡️' : '👧',
+    isEmailVerified: false,
     token,
     isSupabase: false
   }
   currentUser.value = newUser
   saveUserSession(newUser, token)
-  return { success: true, user: newUser, token }
+
+  // Kirim email OTP verifikasi
+  await requestEmailVerificationOtp(cleanEmail, cleanName)
+
+  return { success: true, user: newUser, token, requiresOtp: true }
 }
 
 /**
@@ -652,4 +675,100 @@ export function getProStatusInfo(user = currentUser.value) {
 
 // Re-export JWT utilities for inspection / API client usage
 export { signJWT, verifyJWT, getStoredToken, JWT_STORAGE_KEY }
+
+/**
+ * Membuat 6 digit kode OTP acak
+ */
+export function generateOtpCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+/**
+ * Meminta & mengirimkan kode OTP verifikasi 6-digit ke email
+ */
+export async function requestEmailVerificationOtp(email, name = '') {
+  const cleanEmail = (email || '').trim().toLowerCase()
+  if (!cleanEmail) {
+    return { success: false, message: 'Alamat email wajib diisi.' }
+  }
+
+  const otpCode = generateOtpCode()
+  const expiresAt = Date.now() + 10 * 60 * 1000 // 10 menit
+
+  try {
+    const otps = JSON.parse(localStorage.getItem('inkluvia_pending_otps') || '{}')
+    otps[cleanEmail] = {
+      code: otpCode,
+      expiresAt,
+      name: name || cleanEmail.split('@')[0],
+      createdAt: Date.now()
+    }
+    localStorage.setItem('inkluvia_pending_otps', JSON.stringify(otps))
+  } catch (e) {
+    console.error('Failed to save pending OTP:', e)
+  }
+
+  // Kirim email resmi via Resend API
+  const emailRes = await sendOtpEmail({
+    toEmail: cleanEmail,
+    userName: name || cleanEmail.split('@')[0],
+    otpCode
+  })
+
+  return {
+    success: true,
+    otpCode,
+    expiresAt,
+    message: emailRes.message || 'Kode OTP telah dikirimkan ke email Anda.'
+  }
+}
+
+/**
+ * Memverifikasi 6 digit kode OTP yang dimasukkan pengguna
+ */
+export function verifyEmailOtp(email, inputOtp) {
+  const cleanEmail = (email || '').trim().toLowerCase()
+  const cleanOtp = (inputOtp || '').toString().trim().replace(/[^0-9]/g, '')
+
+  if (!cleanEmail || !cleanOtp) {
+    return { success: false, message: 'Silakan masukkan 6 digit kode OTP.' }
+  }
+
+  try {
+    const otps = JSON.parse(localStorage.getItem('inkluvia_pending_otps') || '{}')
+    const record = otps[cleanEmail]
+
+    if (!record) {
+      return { success: false, message: 'Kode OTP tidak ditemukan atau telah kadaluarsa. Silakan klik kirim ulang.' }
+    }
+
+    if (Date.now() > record.expiresAt) {
+      delete otps[cleanEmail]
+      localStorage.setItem('inkluvia_pending_otps', JSON.stringify(otps))
+      return { success: false, message: 'Kode OTP telah kadaluarsa (lebih dari 10 menit). Silakan minta kode baru.' }
+    }
+
+    if (record.code !== cleanOtp) {
+      return { success: false, message: 'Kode OTP yang Anda masukkan salah. Periksa kembali dan coba lagi.' }
+    }
+
+    // VERIFIKASI BERHASIL! Hapus OTP pending & tandai email terverifikasi
+    delete otps[cleanEmail]
+    localStorage.setItem('inkluvia_pending_otps', JSON.stringify(otps))
+
+    const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
+    verifiedRegistry[cleanEmail] = true
+    localStorage.setItem('inkluvia_verified_emails', JSON.stringify(verifiedRegistry))
+
+    if (currentUser.value && (currentUser.value.email || '').toLowerCase() === cleanEmail) {
+      currentUser.value.isEmailVerified = true
+      saveUserSession(currentUser.value)
+    }
+
+    return { success: true, message: 'Verifikasi email berhasil! Akun Anda aktif sepenuhnya.' }
+  } catch (e) {
+    console.error('Error verifying OTP:', e)
+    return { success: false, message: 'Gagal memverifikasi kode OTP.' }
+  }
+}
 

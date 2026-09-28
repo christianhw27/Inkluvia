@@ -526,6 +526,16 @@ onMounted(async () => {
               </div>
 
               <div class="flex items-center justify-between text-slate-500">
+                <span class="font-medium">Verifikasi Email:</span>
+                <span
+                  class="font-extrabold flex items-center gap-1"
+                  :class="currentUser?.isEmailVerified || isAdmin ? 'text-emerald-600' : 'text-amber-600'"
+                >
+                  <span>{{ currentUser?.isEmailVerified || isAdmin ? '✓ Terverifikasi (Resend)' : '⚠️ Belum Terverifikasi' }}</span>
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between text-slate-500">
                 <span class="font-medium">Tipe Layanan:</span>
                 <span v-if="proStatus.isPro || isAdmin" class="font-black text-amber-600 flex items-center gap-1">
                   <span>👑</span>
