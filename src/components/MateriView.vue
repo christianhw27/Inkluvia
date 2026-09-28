@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { materiList } from '../lib/materiService'
 import {
   ArrowRight,
@@ -7,7 +7,10 @@ import {
   RotateCcw,
   Sparkles,
   Clock,
-  Video
+  Video,
+  ChevronDown,
+  ChevronUp,
+  BookOpen
 } from '@lucide/vue'
 import DoodleOrnament from './DoodleOrnament.vue'
 import { currentUser, isAdmin, isProUser } from '../lib/authService'
@@ -60,6 +63,37 @@ const kelasOptions = computed(() => {
   return ['Semua', ...allKelasList]
 })
 
+// Expand/Collapse logic for Kelas (for 'Semua' & 'SD', initially hide beyond 'Kelas 3')
+const isKelasExpandable = computed(() =>
+  selectedJenjang.value === 'Semua' || selectedJenjang.value === 'SD'
+)
+const showAllKelas = ref(false)
+
+const toggleShowAllKelas = () => {
+  playButtonPop()
+  showAllKelas.value = !showAllKelas.value
+}
+
+const visibleKelasOptions = computed(() => {
+  const options = kelasOptions.value
+  if (!isKelasExpandable.value || showAllKelas.value) {
+    return options
+  }
+  // Initial limit up to 'Kelas 3': ['Semua', 'Kelas 1', 'Kelas 2', 'Kelas 3']
+  return options.slice(0, 4)
+})
+
+const hiddenKelasCount = computed(() => {
+  if (!isKelasExpandable.value) return 0
+  return kelasOptions.value.length - 4
+})
+
+watch(selectedKelas, (val) => {
+  if (val && !['Semua', 'Kelas 1', 'Kelas 2', 'Kelas 3'].includes(val)) {
+    showAllKelas.value = true
+  }
+})
+
 const getItemKelas = (item) => {
   if (!item) return ''
   const lvl = (item.level || '').toLowerCase()
@@ -81,6 +115,7 @@ const getItemKelas = (item) => {
 const onSelectJenjang = (opt) => {
   playButtonPop()
   selectedJenjang.value = opt
+  showAllKelas.value = false
   if (selectedKelas.value !== 'Semua') {
     const valid = opt === 'Semua' ? allKelasList : (kelasByJenjang[opt] || [])
     if (!valid.includes(selectedKelas.value)) {
@@ -88,6 +123,32 @@ const onSelectJenjang = (opt) => {
     }
   }
 }
+
+// Detection for Category in Development (Empty category in database vs search mismatch)
+const isCategoryInDevelopment = computed(() => {
+  if (filteredMateri.value.length > 0) return false
+  if (props.searchQuery.trim() !== '') return false
+
+  const categoryTotal = materiList.value.filter((item) => {
+    if (selectedJenjang.value !== 'Semua' && item.jenjang !== selectedJenjang.value) return false
+    if (selectedMapel.value !== 'Semua' && item.mataPelajaran !== selectedMapel.value) return false
+    if (selectedKelas.value !== 'Semua') {
+      const k = getItemKelas(item)
+      if (k !== selectedKelas.value) return false
+    }
+    return true
+  }).length
+
+  return categoryTotal === 0
+})
+
+const developmentCategoryLabel = computed(() => {
+  const parts = []
+  if (selectedJenjang.value !== 'Semua') parts.push(selectedJenjang.value)
+  if (selectedKelas.value !== 'Semua') parts.push(selectedKelas.value)
+  if (selectedMapel.value !== 'Semua') parts.push(selectedMapel.value)
+  return parts.length ? parts.join(' • ') : 'Kategori Ini'
+})
 
 const hasActiveFilter = computed(() =>
   selectedJenjang.value !== 'Semua' ||
@@ -158,11 +219,11 @@ const resetFilters = () => {
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center px-1 py-1 relative">
         <!-- Text Left -->
         <div class="lg:col-span-8 space-y-1.5 text-left">
-          <h1 class="text-3xl sm:text-4xl lg:text-4xl font-black text-[#0F3261] tracking-tight leading-tight">
+          <h1 class="text-3xl sm:text-5xl font-black text-[#0F3261] tracking-tight leading-tight">
             Jelajahi Materi Pembelajaran
           </h1>
           
-          <p class="text-xs sm:text-sm text-slate-500 font-semibold leading-relaxed max-w-xl">
+          <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed max-w-xl">
             Temukan media pembelajaran yang sesuai dengan kebutuhanmu.
           </p>
         </div>
@@ -266,9 +327,9 @@ const resetFilters = () => {
                   Menampilkan kelas untuk jenjang {{ selectedJenjang }}
                 </span>
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <button
-                  v-for="opt in kelasOptions"
+                  v-for="opt in visibleKelasOptions"
                   :key="opt"
                   @click="selectedKelas = opt; playButtonPop()"
                   :class="[
@@ -279,6 +340,18 @@ const resetFilters = () => {
                   ]"
                 >
                   {{ opt }}
+                </button>
+
+                <!-- Show More / Less Toggle Button for Semua & SD -->
+                <button
+                  v-if="isKelasExpandable && hiddenKelasCount > 0"
+                  type="button"
+                  @click="toggleShowAllKelas"
+                  class="px-3.5 py-1.5 rounded-full text-xs font-extrabold text-[#3587CE] bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer flex items-center gap-1 active:scale-95"
+                >
+                  <span v-if="!showAllKelas">+ {{ hiddenKelasCount }} Kelas Lainnya</span>
+                  <span v-else>Sembunyikan Kelas</span>
+                  <component :is="showAllKelas ? ChevronUp : ChevronDown" class="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -292,18 +365,65 @@ const resetFilters = () => {
             Menampilkan <strong class="text-[#0F3261] font-black text-sm">{{ filteredMateri.length }}</strong> materi pembelajaran
           </div>
 
-          <!-- Empty State -->
-          <div v-if="filteredMateri.length === 0" class="bg-slate-50/70 rounded-2xl p-10 border border-slate-200/80 text-center space-y-4">
-            <div class="w-16 h-16 rounded-full bg-white border border-slate-200 flex items-center justify-center mx-auto">
-              <Film class="w-7 h-7 text-slate-300" />
+          <!-- Empty State Case 1: Category in Development (Non-filter search zero-content) -->
+          <div
+            v-if="filteredMateri.length === 0 && isCategoryInDevelopment"
+            class="bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-slate-50 rounded-3xl p-8 sm:p-12 border-2 border-dashed border-amber-300/80 text-center space-y-4 shadow-xs relative overflow-hidden animate-soft-pop"
+          >
+            <!-- Background Ornaments -->
+            <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-200/20 blur-2xl pointer-events-none"></div>
+
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-[#FF7315] text-white flex items-center justify-center mx-auto shadow-md shadow-orange-500/20">
+              <Sparkles class="w-8 h-8 text-white animate-pulse" />
             </div>
-            <h3 class="text-base font-extrabold text-[#0F3261]">Tidak Ada Materi yang Cocok</h3>
-            <p class="text-sm text-slate-500 max-w-sm mx-auto font-medium">
-              Coba ubah filter atau kata kunci pencarian.
-            </p>
+
+            <div class="space-y-1.5 max-w-md mx-auto">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 uppercase tracking-wider">
+                🚧 TAHAP PENGEMBANGAN MODUL
+              </span>
+              <h3 class="text-lg sm:text-xl font-black text-[#0F3261] pt-1">
+                Modul {{ developmentCategoryLabel }} Segera Hadir! 🚀
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+                Tim kurikulum & pengajar inklusif Inkluvia sedang aktif menyusun media pembelajaran adaptif untuk kategori ini. Silakan jelajahi modul SD yang sudah tersedia atau cek kembali secara berkala!
+              </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                @click="onSelectJenjang('SD')"
+                class="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#FF7315] hover:bg-[#e86105] text-white text-xs font-extrabold transition cursor-pointer shadow-md flex items-center justify-center gap-2"
+              >
+                <BookOpen class="w-4 h-4" />
+                <span>Lihat Modul SD yang Tersedia</span>
+              </button>
+
+              <button
+                @click="resetFilters"
+                class="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-100 text-[#0F3261] border border-slate-300 text-xs font-extrabold transition cursor-pointer"
+              >
+                Tampilkan Semua Materi
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State Case 2: Filter / Search Query No Match -->
+          <div
+            v-else-if="filteredMateri.length === 0"
+            class="bg-slate-50/80 rounded-3xl p-8 sm:p-10 border border-slate-200/80 text-center space-y-4"
+          >
+            <div class="w-16 h-16 rounded-full bg-white border border-slate-200 flex items-center justify-center mx-auto shadow-xs">
+              <Film class="w-7 h-7 text-slate-400" />
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-base font-extrabold text-[#0F3261]">Tidak Ada Materi yang Cocok</h3>
+              <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto font-medium">
+                Kombinasi filter atau kata kunci pencarian tersebut tidak menemukan hasil. Coba ubah atau reset filter.
+              </p>
+            </div>
             <button
               @click="resetFilters"
-              class="px-5 py-2.5 rounded-full bg-[#0F3261] text-white text-xs font-extrabold hover:bg-[#10458C] transition cursor-pointer shadow-md"
+              class="px-5 py-2.5 rounded-2xl bg-[#0F3261] text-white text-xs font-extrabold hover:bg-[#10458C] transition cursor-pointer shadow-md"
             >
               Reset Filter
             </button>
