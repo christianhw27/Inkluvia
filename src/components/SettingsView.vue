@@ -379,7 +379,7 @@ onMounted(async () => {
 
 <template>
   <div
-    class="w-full min-h-[calc(100vh-68px)] bg-[#F8FAFD] py-8 sm:py-10 relative overflow-hidden"
+    class="w-full min-h-screen bg-[#F8FAFD] pt-24 sm:pt-28 pb-10 relative overflow-hidden"
     style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
   >
     <!-- Background Ambient Glow Blobs -->
@@ -400,7 +400,7 @@ onMounted(async () => {
       <DoodleOrnament name="dots-duo" :size="40" />
     </div>
 
-    <div class="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-10 space-y-6 relative z-10">
+    <div class="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-10 space-y-6 relative z-10 animate-soft-pop">
 
       <!-- Breadcrumbs & Top Navigation Bar -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

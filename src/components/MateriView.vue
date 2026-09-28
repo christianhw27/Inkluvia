@@ -113,7 +113,7 @@ const resetFilters = () => {
 
 <template>
   <div
-    class="w-full flex flex-col flex-1 pt-4 sm:pt-6 pb-12 px-4 sm:px-6 lg:px-10 space-y-4 sm:space-y-5 relative overflow-hidden"
+    class="w-full flex flex-col flex-1 pt-24 sm:pt-28 pb-12 px-4 sm:px-6 lg:px-10 space-y-4 sm:space-y-5 relative overflow-hidden"
     style="background-image: radial-gradient(#d3e5fa 1.2px, transparent 1.2px); background-size: 30px 30px;"
   >
     <!-- Background Ambient Glow Blobs -->
@@ -140,7 +140,7 @@ const resetFilters = () => {
       <DoodleOrnament name="burst" color="#54AA1B" :size="32" />
     </div>
 
-    <div class="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-5 relative z-10">
+    <div class="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-5 relative z-10 animate-soft-pop">
 
       <!-- ==================== 1. AREA HEADER HALAMAN ==================== -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center px-1 py-1 relative">

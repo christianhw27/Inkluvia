@@ -122,7 +122,7 @@ const faqs = [
       <DoodleOrnament name="burst" color="#54AA1B" :size="32" />
     </div>
 
-    <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
+    <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10 animate-soft-pop">
 
       <!-- ==================== PAGE HEADER ==================== -->
       <div class="text-center max-w-3xl mx-auto space-y-4">

@@ -32,6 +32,9 @@ import {
   Check,
   Brain,
   Menu,
+  X,
+  Home,
+  Compass,
   Star,
   Edit3,
   MessageSquareHeart,
@@ -131,8 +134,35 @@ const handleModuleClick = (mod) => {
   }
 }
 
+// URL Hash & Session Persistence Helpers
+const ALL_KNOWN_ROUTES = [
+  'beranda',
+  'materi',
+  'materi-detail',
+  'mode-select',
+  'learning-player',
+  'admin',
+  'harga',
+  'settings',
+  'auth'
+]
+
+const getInitialRoute = () => {
+  const rawHash = (window.location.hash || '').replace(/^#\/?/, '').trim()
+  if (rawHash && ALL_KNOWN_ROUTES.includes(rawHash)) {
+    return rawHash
+  }
+  const storedNav = sessionStorage.getItem('inkluvia_current_nav')
+  if (storedNav && ALL_KNOWN_ROUTES.includes(storedNav)) {
+    return storedNav
+  }
+  return 'beranda'
+}
+
 // Navigation state
-const currentNav = ref('beranda')
+const initialRouteCandidate = getInitialRoute()
+const initialGuard = canAccessRoute(initialRouteCandidate)
+const currentNav = ref(initialGuard.allowed ? initialRouteCandidate : 'beranda')
 const searchQuery = ref('')
 
 // Sound state
@@ -296,11 +326,24 @@ const handleAuthenticated = (user) => {
   }
 }
 
+const updateHashAndStorage = (route) => {
+  if (route && ALL_KNOWN_ROUTES.includes(route)) {
+    if (window.location.hash !== `#${route}`) {
+      window.history.replaceState(null, '', `#${route}`)
+    }
+    sessionStorage.setItem('inkluvia_current_nav', route)
+  }
+}
+
 const handleLogout = async () => {
   await logoutUser()
   intendedNav.value = null
+  sessionStorage.removeItem('inkluvia_current_nav')
+  sessionStorage.removeItem('inkluvia_active_materi_id')
+  sessionStorage.removeItem('inkluvia_chosen_mode')
   if (['admin', 'settings', ...PROTECTED_ROUTES].includes(currentNav.value)) {
     currentNav.value = 'beranda'
+    updateHashAndStorage('beranda')
   }
 }
 
@@ -349,14 +392,62 @@ const handleWindowScroll = () => {
   }
 }
 
+const handleHashChange = () => {
+  const rawHash = (window.location.hash || '').replace(/^#\/?/, '').trim() || 'beranda'
+  if (ALL_KNOWN_ROUTES.includes(rawHash) && rawHash !== currentNav.value) {
+    const guard = canAccessRoute(rawHash)
+    if (guard.allowed) {
+      currentNav.value = rawHash
+    } else {
+      navigateToAuth(guard.tab || 'login', guard.reason)
+    }
+  }
+}
+
+// Intersection Observer helper for Scroll Reveal Animations
+const initScrollObserver = () => {
+  if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed')
+        }
+      })
+    },
+    {
+      threshold: 0.08,
+      rootMargin: '0px 0px -30px 0px'
+    }
+  )
+
+  setTimeout(() => {
+    const targets = document.querySelectorAll('.reveal-on-scroll, .reveal-left, .reveal-right, .reveal-zoom')
+    targets.forEach((el) => observer.observe(el))
+  }, 100)
+}
+
 onMounted(async () => {
   window.addEventListener('scroll', handleWindowScroll, { passive: true })
+  window.addEventListener('hashchange', handleHashChange)
   await fetchSiteReviewsFromSupabase()
   refreshDisplayReviews()
+
+  const initialRoute = getInitialRoute()
+  const guard = canAccessRoute(initialRoute)
+  if (guard.allowed) {
+    currentNav.value = initialRoute
+  } else {
+    currentNav.value = 'beranda'
+  }
+  updateHashAndStorage(currentNav.value)
+  initScrollObserver()
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleWindowScroll)
+  window.removeEventListener('hashchange', handleHashChange)
 })
 
 /**
@@ -426,10 +517,50 @@ const handlePreviewFromAdmin = (item) => {
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
-// Selalu reset scroll ke posisi paling atas setiap kali berpindah halaman/rute
-watch(currentNav, () => {
-  window.scrollTo({ top: 0, behavior: 'instant' })
+// State restoration for activeMateriItem and chosenMode
+const restoreActiveMateri = (list) => {
+  const storedId = sessionStorage.getItem('inkluvia_active_materi_id')
+  if (storedId && Array.isArray(list) && list.length) {
+    const found = list.find((m) => String(m.id) === String(storedId))
+    if (found) {
+      activeMateriItem.value = found
+      return
+    }
+  }
+  if (['materi-detail', 'mode-select', 'learning-player'].includes(currentNav.value) && !activeMateriItem.value && Array.isArray(list) && list.length) {
+    activeMateriItem.value = list[0]
+  }
+}
+
+watch(materiList, (newList) => {
+  restoreActiveMateri(newList)
+}, { immediate: true })
+
+watch(activeMateriItem, (newItem) => {
+  if (newItem && newItem.id) {
+    sessionStorage.setItem('inkluvia_active_materi_id', String(newItem.id))
+  }
 })
+
+const storedMode = sessionStorage.getItem('inkluvia_chosen_mode')
+if (storedMode) {
+  chosenMode.value = storedMode
+}
+
+watch(chosenMode, (newMode) => {
+  if (newMode) {
+    sessionStorage.setItem('inkluvia_chosen_mode', newMode)
+  }
+})
+
+// Selalu reset scroll ke posisi paling atas dan sync URL Hash serta re-trigger observer setiap kali berpindah halaman/rute
+watch(currentNav, (newNav) => {
+  window.scrollTo({ top: 0, behavior: 'instant' })
+  updateHashAndStorage(newNav)
+  if (newNav === 'beranda') {
+    initScrollObserver()
+  }
+}, { immediate: true })
 
 // Active Middleware Guard Watcher: jika session habis atau route berubah tanpa izin
 watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
@@ -439,6 +570,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     navigateToAuth(guard.tab || 'login', guard.reason)
   }
 })
+
 </script>
 
 <template>
@@ -449,80 +581,80 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     <div class="absolute top-2/4 left-0 w-[400px] h-[400px] rounded-full bg-[#FF74BC]/06 blur-3xl pointer-events-none z-0"></div>
     <div class="absolute top-3/4 right-0 w-[400px] h-[400px] rounded-full bg-[#74DC2E]/05 blur-3xl pointer-events-none z-0"></div>
 
-    <!-- ==================== SMART AUTO-HIDING NAVBAR ==================== -->
+    <!-- ==================== ULTRA-MODERN FLOATING NAVBAR ==================== -->
     <header
-      v-if="!['learning-player', 'auth'].includes(currentNav)"
+      v-if="!['learning-player', 'auth', 'admin'].includes(currentNav)"
       :class="[
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out',
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out px-3 sm:px-6 lg:px-10',
         isNavVisible ? 'translate-y-0' : '-translate-y-full pointer-events-none',
-        isScrolled
-          ? 'bg-white/92 backdrop-blur-xl border-b border-blue-200/70 shadow-md shadow-[#0F3261]/08 py-2.5'
-          : 'bg-white/85 backdrop-blur-md border-b border-blue-100/60 shadow-xs py-3.5'
+        isScrolled ? 'py-2 sm:py-2.5' : 'py-3 sm:py-4'
       ]"
     >
-      <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4">
+      <!-- Floating Glass Pill Container -->
+      <div
+        :class="[
+          'w-full max-w-[1600px] mx-auto rounded-2xl sm:rounded-full border transition-all duration-300 px-4 sm:px-6 py-2 flex items-center justify-between gap-4 relative overflow-visible',
+          isScrolled
+            ? 'bg-white/92 backdrop-blur-xl border-blue-200/80 shadow-[0_10px_35px_-5px_rgba(15,50,97,0.12)]'
+            : 'bg-white/80 backdrop-blur-md border-white/90 shadow-[0_8px_30px_rgba(15,50,97,0.06)] hover:bg-white/90'
+        ]"
+      >
+        <!-- Top Gradient Glow Accent Bar -->
+        <div class="absolute inset-x-8 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#3DA5FF]/40 to-transparent rounded-full pointer-events-none"></div>
 
-        <!-- Left: Logo + Nav Links -->
-        <div class="flex items-center gap-6 lg:gap-8">
-          <!-- Logo -->
+        <!-- Left: Combined Logo_Text.png + Desktop Segmented Nav -->
+        <div class="flex items-center gap-5 lg:gap-8">
+          <!-- Logo Image (Combined Logo + Stylized Text from public/Logo_Text.png) -->
           <button
             @click="navigateTo('beranda')"
-            class="flex items-center gap-2.5 sm:gap-3 group cursor-pointer shrink-0 text-left focus:outline-none"
+            class="flex items-center group cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-[#3DA5FF]/40 rounded-xl transition-transform active:scale-95"
+            title="Inkluvia - Beranda"
           >
-            <div class="relative w-10 h-10 flex items-center justify-center p-1 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
-              <img
-                src="/Logo.png"
-                alt="Logo Inkluvia"
-                class="h-8 w-auto object-contain"
-              />
-            </div>
-            <div class="flex flex-col">
-              <span class="text-[22px] font-black tracking-tight leading-none" style="background: linear-gradient(135deg, #0F3261 0%, #3587CE 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                Inkluvia
-              </span>
-              <span class="text-[10px] font-extrabold text-[#FF7315] tracking-wide uppercase mt-0.5 hidden sm:block">
-                Belajar Inklusif
-              </span>
-            </div>
+            <img
+              src="/Logo_Text.png"
+              alt="Inkluvia - Belajar Inklusif"
+              class="h-11 sm:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03] filter drop-shadow-xs"
+            />
           </button>
 
-          <!-- Nav Links (Desktop Segmented Navigation) -->
-          <nav class="hidden md:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/70 backdrop-blur-xs">
+          <!-- Nav Links (Uniform & Ultra-Smooth Navigation Tabs) -->
+          <nav class="hidden md:flex items-center gap-1.5 lg:gap-2">
             <button
               @click="navigateTo('beranda')"
               :class="[
-                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                'h-10 px-4 rounded-full text-sm font-extrabold cursor-pointer inline-flex items-center justify-center gap-2 transition-all duration-300 ease-out select-none',
                 currentNav === 'beranda'
-                  ? 'bg-[#0F3261] text-white shadow-sm shadow-[#0F3261]/25'
-                  : 'text-slate-600 hover:text-[#0F3261] hover:bg-white/80'
+                  ? 'bg-gradient-to-r from-[#0F3261] to-[#1E4D8C] text-white shadow-md shadow-[#0F3261]/25 scale-[1.02]'
+                  : 'text-slate-600 hover:text-[#0F3261] hover:bg-slate-100/80'
               ]"
             >
+              <Home class="w-4 h-4 shrink-0" />
               <span>Beranda</span>
             </button>
 
             <button
               @click="navigateTo('materi')"
               :class="[
-                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                'h-10 px-4 rounded-full text-sm font-extrabold cursor-pointer inline-flex items-center justify-center gap-2 transition-all duration-300 ease-out select-none',
                 ['materi', 'materi-detail', 'mode-select'].includes(currentNav)
-                  ? 'bg-[#FF7315] text-white shadow-sm shadow-[#FF7315]/25'
-                  : 'text-slate-600 hover:text-[#FF7315] hover:bg-white/80'
+                  ? 'bg-gradient-to-r from-[#FF7315] to-[#FF9248] text-white shadow-md shadow-[#FF7315]/30 scale-[1.02]'
+                  : 'text-slate-600 hover:text-[#FF7315] hover:bg-slate-100/80'
               ]"
             >
+              <Compass class="w-4 h-4 shrink-0" />
               <span>Materi</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-[#FF7315]" v-if="!['materi', 'materi-detail', 'mode-select'].includes(currentNav)"></span>
             </button>
 
             <button
               @click="navigateTo('harga')"
               :class="[
-                'px-4 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                'h-10 px-4 rounded-full text-sm font-extrabold cursor-pointer inline-flex items-center justify-center gap-2 transition-all duration-300 ease-out select-none',
                 currentNav === 'harga'
-                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/25'
-                  : 'text-slate-600 hover:text-amber-600 hover:bg-white/80'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/30 scale-[1.02]'
+                  : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100/80'
               ]"
             >
-              <Sparkles class="w-3.5 h-3.5 text-amber-400" v-if="currentNav !== 'harga'" />
+              <Sparkles class="w-4 h-4 shrink-0" />
               <span>Harga</span>
             </button>
 
@@ -530,69 +662,73 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               v-if="isAdmin"
               @click="navigateTo('admin')"
               :class="[
-                'px-3.5 py-2 rounded-xl text-xs lg:text-sm font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5',
+                'h-10 px-4 rounded-full text-sm font-extrabold cursor-pointer inline-flex items-center justify-center gap-2 transition-all duration-300 ease-out select-none',
                 currentNav === 'admin'
-                  ? 'bg-[#54AA1B] text-white shadow-sm'
-                  : 'text-[#54AA1B] hover:bg-emerald-50'
+                  ? 'bg-gradient-to-r from-[#54AA1B] to-emerald-600 text-white shadow-md shadow-emerald-500/25 scale-[1.02]'
+                  : 'text-[#54AA1B] hover:bg-emerald-50 hover:text-emerald-700'
               ]"
             >
-              <LayoutDashboard class="w-3.5 h-3.5" />
+              <LayoutDashboard class="w-4 h-4 shrink-0" />
               <span>CMS Admin</span>
             </button>
           </nav>
         </div>
 
-        <!-- Right: Audio FX Toggle + Search + Auth Desktop + Mobile Hamburger -->
-        <div class="flex items-center gap-2.5 sm:gap-3 flex-1 justify-end max-w-md">
+        <!-- Right: Auth / User Profile Pill -->
+        <div class="flex items-center gap-2.5 sm:gap-3 justify-end">
           
-          <!-- NOT LOGGED IN DESKTOP -->
-          <div v-if="!isAuthenticated" class="hidden sm:flex items-center gap-2 shrink-0">
+          <!-- NOT LOGGED IN DESKTOP BUTTONS -->
+          <div v-if="!isAuthenticated" class="hidden sm:flex items-center gap-2.5 shrink-0">
             <button
               @click="navigateToAuth('login')"
-              class="px-4 py-2 rounded-full border-2 border-blue-200 hover:border-[#3DA5FF] text-[#0F3261] hover:text-[#3587CE] hover:bg-blue-50/60 font-bold text-xs lg:text-sm transition-all duration-200 active:scale-95 cursor-pointer"
+              class="px-4 lg:px-5 py-2 rounded-full border-2 border-blue-100 hover:border-[#3DA5FF] text-[#0F3261] hover:text-[#3587CE] hover:bg-blue-50/70 font-extrabold text-xs lg:text-sm transition-all duration-200 active:scale-95 cursor-pointer"
             >
               Masuk
             </button>
             <button
               @click="navigateToAuth('register')"
-              class="px-5 py-2 rounded-full text-white font-black text-xs lg:text-sm transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:shadow-[#FF7315]/25"
-              style="background: linear-gradient(135deg, #FF7315 0%, #E86105 100%);"
+              class="relative group overflow-hidden px-5 lg:px-6 py-2 rounded-full text-white font-black text-xs lg:text-sm transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer shadow-md shadow-[#FF7315]/30 hover:shadow-lg hover:shadow-[#FF7315]/45"
+              style="background: linear-gradient(135deg, #FF7315 0%, #FF8A3D 50%, #E86105 100%);"
             >
-              Daftar Gratis
+              <span class="relative z-10 flex items-center gap-1.5">
+                <span>Daftar Gratis</span>
+                <Sparkles class="w-3.5 h-3.5 text-amber-200 group-hover:rotate-12 transition-transform" />
+              </span>
+              <div class="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             </button>
           </div>
 
-          <!-- LOGGED IN DESKTOP: Dynamic Circle Avatar that Expands to Oval on Hover -->
+          <!-- LOGGED IN DESKTOP: Larger & Perfectly Proportioned Avatar Button -->
           <div v-else class="hidden sm:flex items-center shrink-0">
             <button
               @click="openSettings('profile')"
               title="Buka Pengaturan Akun & Profil"
-              class="group relative flex items-center h-11 rounded-full bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all duration-300 ease-out cursor-pointer shadow-2xs hover:shadow-md p-1 overflow-hidden"
+              class="group flex items-center gap-2.5 h-11 sm:h-12 pl-1.5 pr-4 rounded-full bg-white hover:bg-blue-50/90 border-2 border-blue-200/90 hover:border-[#3DA5FF] shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer active:scale-95"
             >
-              <!-- Avatar Circle (Selalu tampak lingkaran) -->
-              <div class="relative w-9 h-9 rounded-full flex items-center justify-center text-lg bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-2xs shrink-0 select-none group-hover:scale-105 transition-transform duration-300">
+              <!-- Avatar Circle (Larger & Prominent) -->
+              <div class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-lg sm:text-xl bg-gradient-to-br from-blue-100 via-sky-100 to-indigo-100 border border-blue-200/80 shadow-2xs shrink-0 select-none group-hover:scale-105 transition-transform">
                 <span class="select-none leading-none">{{ currentUser?.avatar || '👧' }}</span>
                 <span
-                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
+                  class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white shadow-2xs"
                   :class="isAdmin ? 'bg-[#FF7315]' : 'bg-emerald-500'"
                 ></span>
               </div>
 
-              <!-- Collapsible Info Container: Tersembunyi saat normal, mekar jadi oval saat di-hover -->
-              <div class="flex flex-col text-left max-w-0 opacity-0 group-hover:max-w-[240px] group-hover:opacity-100 group-hover:pl-2.5 group-hover:pr-2.5 transition-all duration-300 ease-out overflow-hidden whitespace-nowrap select-none">
+              <!-- User Info Badge Text -->
+              <div class="flex flex-col text-left select-none">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-black text-[#0F3261] leading-tight truncate">
-                    {{ currentUser?.name || 'Pengguna Inkluvia' }}
+                  <span class="text-xs sm:text-sm font-black text-[#0F3261] leading-tight max-w-[120px] sm:max-w-[150px] truncate">
+                    {{ currentUser?.name || 'Pengguna' }}
                   </span>
                   <span
                     v-if="currentUser?.isPro || isAdmin"
-                    class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs shrink-0"
+                    class="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs shrink-0"
                   >
                     👑 PRO
                   </span>
                 </div>
-                <span class="text-[10px] font-bold text-slate-400 leading-tight mt-0.5">
-                  {{ isAdmin ? 'Admin' : (currentUser?.isPro ? 'Member PRO' : 'Akun Saya') }}
+                <span class="text-[10px] sm:text-[11px] font-extrabold text-slate-400 leading-tight">
+                  {{ isAdmin ? 'Administrator' : (currentUser?.isPro ? 'Member PRO' : 'Pengaturan Akun') }}
                 </span>
               </div>
             </button>
@@ -601,7 +737,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           <!-- Mobile Hamburger Toggle Button -->
           <button
             @click="isMobileMenuOpen = !isMobileMenuOpen"
-            class="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            class="md:hidden p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
             aria-label="Toggle Menu"
           >
             <X v-if="isMobileMenuOpen" class="w-5 h-5 text-[#0F3261]" />
@@ -614,7 +750,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       <transition name="dropdown">
         <div
           v-if="isMobileMenuOpen"
-          class="md:hidden bg-white/95 backdrop-blur-xl border-b border-blue-100 px-5 py-4 space-y-3 shadow-xl"
+          class="md:hidden mt-2 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-3xl px-5 py-4 space-y-3 shadow-2xl overflow-hidden"
         >
           <!-- Mobile Search -->
           <div class="relative">
@@ -623,7 +759,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               v-model="searchQuery"
               type="text"
               placeholder="Cari materi belajar..."
-              class="w-full bg-slate-100 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-[#3DA5FF] focus:outline-none transition"
+              class="w-full bg-slate-100 text-sm pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 focus:border-[#3DA5FF] focus:outline-none transition"
             />
           </div>
 
@@ -632,33 +768,40 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <button
               @click="navigateTo('beranda')"
               :class="[
-                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-extrabold flex items-center justify-between',
                 currentNav === 'beranda' ? 'bg-[#0F3261] text-white' : 'text-slate-700 hover:bg-slate-100'
               ]"
             >
-              <span>Beranda</span>
+              <div class="flex items-center gap-2">
+                <Home class="w-4 h-4 opacity-80" />
+                <span>Beranda</span>
+              </div>
               <ArrowRight class="w-4 h-4 opacity-70" />
             </button>
 
             <button
               @click="navigateTo('materi')"
               :class="[
-                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-extrabold flex items-center justify-between',
                 ['materi', 'materi-detail', 'mode-select'].includes(currentNav) ? 'bg-[#FF7315] text-white' : 'text-slate-700 hover:bg-slate-100'
               ]"
             >
-              <span>Katalog Materi</span>
+              <div class="flex items-center gap-2">
+                <Compass class="w-4 h-4 opacity-80" />
+                <span>Katalog Materi</span>
+              </div>
               <ArrowRight class="w-4 h-4 opacity-70" />
             </button>
 
             <button
               @click="navigateTo('harga')"
               :class="[
-                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-extrabold flex items-center justify-between',
                 currentNav === 'harga' ? 'bg-amber-500 text-white' : 'text-slate-700 hover:bg-slate-100'
               ]"
             >
               <div class="flex items-center gap-2">
+                <Sparkles class="w-4 h-4 text-amber-400" />
                 <span>Paket Langganan (Harga)</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">Promo</span>
               </div>
@@ -669,11 +812,14 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               v-if="isAdmin"
               @click="navigateTo('admin')"
               :class="[
-                'w-full text-left px-4 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-between',
+                'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-extrabold flex items-center justify-between',
                 currentNav === 'admin' ? 'bg-[#54AA1B] text-white' : 'text-[#54AA1B] hover:bg-emerald-50'
               ]"
             >
-              <span>CMS Admin Inkluvia</span>
+              <div class="flex items-center gap-2">
+                <LayoutDashboard class="w-4 h-4" />
+                <span>CMS Admin Inkluvia</span>
+              </div>
               <ArrowRight class="w-4 h-4 opacity-70" />
             </button>
           </div>
@@ -683,13 +829,13 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <template v-if="!isAuthenticated">
               <button
                 @click="navigateToAuth('login')"
-                class="w-full py-2.5 rounded-xl border border-blue-200 text-[#0F3261] font-bold text-sm text-center"
+                class="w-full py-2.5 rounded-2xl border border-blue-200 text-[#0F3261] font-bold text-sm text-center"
               >
                 Masuk ke Akun
               </button>
               <button
                 @click="navigateToAuth('register')"
-                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF7315] to-[#E86105] text-white font-black text-sm text-center shadow-md"
+                class="w-full py-2.5 rounded-2xl bg-gradient-to-r from-[#FF7315] to-[#E86105] text-white font-black text-sm text-center shadow-md"
               >
                 Daftar Gratis Sekarang
               </button>
@@ -697,7 +843,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <template v-else>
               <button
                 @click="openSettings('profile')"
-                class="w-full py-2.5 px-4 rounded-xl bg-blue-50 text-[#0F3261] font-bold text-sm flex items-center justify-between"
+                class="w-full py-2.5 px-4 rounded-2xl bg-blue-50 text-[#0F3261] font-bold text-sm flex items-center justify-between"
               >
                 <div class="flex items-center gap-2">
                   <span>{{ currentUser?.avatar || '👧' }}</span>
@@ -705,7 +851,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                     <span class="font-extrabold">{{ currentUser?.name || 'Profil Akun' }}</span>
                     <span
                       v-if="currentUser?.isPro || isAdmin"
-                      class="px-1.5 py-0.2 rounded text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs"
+                      class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs"
                     >
                       👑 PRO
                     </span>
@@ -715,7 +861,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
               </button>
               <button
                 @click="handleLogout"
-                class="w-full py-2 text-rose-500 font-bold text-xs text-center hover:bg-rose-50 rounded-lg transition"
+                class="w-full py-2 text-rose-500 font-bold text-xs text-center hover:bg-rose-50 rounded-xl transition"
               >
                 Keluar (Logout)
               </button>
@@ -725,17 +871,11 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       </transition>
     </header>
 
-    <!-- Spacer to reserve space for fixed navbar -->
-    <div
-      v-if="!['learning-player', 'auth'].includes(currentNav)"
-      class="h-[68px] sm:h-[72px] shrink-0 pointer-events-none"
-    ></div>
-
     <!-- ==================== VIEW: BERANDA ==================== -->
     <main v-if="currentNav === 'beranda'" class="flex-1 flex flex-col">
 
       <!-- ===== HERO SECTION (CLEAN, PLAYFUL & BALANCED EDTECH STYLE) ===== -->
-      <section class="relative w-full overflow-hidden flex flex-col justify-center min-h-[calc(100vh-68px)] lg:h-[calc(100vh-68px)]" style="background-color: #F8FAFD; background-image: radial-gradient(#d3e4f7 1.2px, transparent 1.2px); background-size: 30px 30px; border-bottom: 1px solid rgba(61, 165, 255, 0.15);">
+      <section class="relative w-full overflow-hidden flex flex-col justify-center min-h-screen pt-24 sm:pt-28 lg:pt-32 pb-12 lg:pb-16" style="background-color: #F8FAFD; background-image: radial-gradient(#d3e4f7 1.2px, transparent 1.2px); background-size: 30px 30px; border-bottom: 1px solid rgba(61, 165, 255, 0.15);">
         
         <!-- Grid Vignette Overlay -->
         <div class="absolute inset-0 pointer-events-none z-0" style="background: radial-gradient(ellipse at 50% 50%, transparent 25%, #F8FAFD 100%);"></div>
@@ -765,18 +905,10 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           <span class="text-[22vw] font-black tracking-tighter text-transparent opacity-[0.05]" style="-webkit-text-stroke: 3px #0F3261; transform: translateY(-5%);">INKLUVIA</span>
         </div>
 
-        <!-- Sound Toggle Button (Clean corner placement) -->
-        <button
-          @click="handleToggleSound"
-          class="absolute top-4 right-4 sm:right-6 z-40 p-2 rounded-full bg-white/90 backdrop-blur border border-slate-200 text-slate-600 hover:text-[#0F3261] hover:border-[#3DA5FF] shadow-2xs transition cursor-pointer"
-          :title="soundActive ? 'Matikan Efek Suara' : 'Nyalakan Efek Suara'"
-        >
-          <Volume2 v-if="soundActive" class="w-4 h-4 text-[#3587CE]" />
-          <VolumeX v-else class="w-4 h-4 text-slate-400" />
-        </button>
+
 
         <!-- Main Content Wrapper: Vertically Centered Grid -->
-        <div class="relative z-10 w-full flex-1 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col justify-center py-6 lg:py-8">
+        <div class="relative z-10 w-full flex-1 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col justify-center py-6 lg:py-8 animate-soft-pop">
           
           <!-- Desktop 2-Column Grid (items-center makes text & photo perfectly aligned) -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center w-full">
@@ -943,7 +1075,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
           
           <!-- Section Header -->
-          <div class="text-center max-w-3xl mx-auto space-y-3">
+          <div class="text-center max-w-3xl mx-auto space-y-3 reveal-zoom">
             <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100/80 text-[#3587CE] text-xs font-extrabold tracking-wide uppercase">
               MENGAPA INKLUVIA
             </span>
@@ -959,7 +1091,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             <!-- Card 1: Multi-Sensori -->
-            <div class="bg-white rounded-3xl p-6 border border-orange-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div class="bg-white rounded-3xl p-6 border border-orange-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-100">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-[#FF7315] text-white flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-110 transition-transform">
                   <Headphones class="w-7 h-7" />
@@ -983,7 +1115,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </div>
 
             <!-- Card 2: Tipografi Ramah Baca & Disleksia -->
-            <div class="bg-white rounded-3xl p-6 border border-blue-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div class="bg-white rounded-3xl p-6 border border-blue-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-200">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-[#3DA5FF] text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
                   <Type class="w-7 h-7" />
@@ -1006,7 +1138,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </div>
 
             <!-- Card 3: Zero-Pressure Pace -->
-            <div class="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div class="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-300">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-400 to-[#E1529C] text-white flex items-center justify-center shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform">
                   <Clock class="w-7 h-7" />
@@ -1024,7 +1156,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             </div>
 
             <!-- Card 4: Aman & Bebas Iklan -->
-            <div class="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div class="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group reveal-on-scroll delay-400">
               <div class="space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-[#54AA1B] text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
                   <ShieldCheck class="w-7 h-7" />
@@ -1072,7 +1204,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <div class="w-full max-w-[1440px] mx-auto space-y-10">
           
           <!-- Section Header -->
-          <div class="text-center max-w-3xl mx-auto space-y-3">
+          <div class="text-center max-w-3xl mx-auto space-y-3 reveal-zoom">
             <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-100/80 text-[#FF7315] text-xs font-extrabold tracking-wide uppercase">
               JELAJAHI MATERI
             </span>
@@ -1085,7 +1217,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           </div>
 
           <!-- Jenjang Filter Tabs (Semua, SD, SMP, SMA) -->
-          <div class="flex items-center justify-center flex-wrap gap-2.5 sm:gap-3.5">
+          <div class="flex items-center justify-center flex-wrap gap-2.5 sm:gap-3.5 reveal-on-scroll delay-100">
             <button
               v-for="jenjang in ['Semua', 'SD', 'SMP', 'SMA']"
               :key="jenjang"
@@ -1138,9 +1270,12 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- 3. REAL DATABASE CARDS: Yang gratis ya gratis, yang berbayar ya PRO -->
             <div
               v-else
-              v-for="mod in filteredLandingModules"
+              v-for="(mod, index) in filteredLandingModules"
               :key="mod.id"
-              class="bg-white rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative"
+              :class="[
+                'bg-white rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between overflow-hidden group relative reveal-on-scroll',
+                index === 0 ? 'delay-100' : index === 1 ? 'delay-200' : index === 2 ? 'delay-300' : 'delay-400'
+              ]"
             >
               <!-- Card Top Image Banner -->
               <div class="relative h-44 w-full overflow-hidden bg-slate-100">
@@ -1329,7 +1464,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
         <div class="w-full max-w-5xl mx-auto space-y-12 relative z-10">
           
           <!-- Section Header (Clean, Calm, Spacious) -->
-          <div class="text-center max-w-2xl mx-auto space-y-3">
+          <div class="text-center max-w-2xl mx-auto space-y-3 reveal-zoom">
             <span class="inline-flex items-center px-3.5 py-1 rounded-full bg-blue-50 text-[#3587CE] text-xs font-bold uppercase tracking-wider border border-blue-200/60">
               Pilihan Cara Belajar
             </span>
@@ -1347,7 +1482,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- 1. Mode Standar (Inkluvia Blue Theme) -->
             <div
               @click="chosenMode = 'standard'; handleStartAdventure(); playButtonPop()"
-              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#3DA5FF] shadow-xs hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#3DA5FF] shadow-xs hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden reveal-on-scroll delay-100"
             >
               <!-- Subtle Top Accent Hover Glow -->
               <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#3DA5FF] to-[#3587CE] opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -1403,7 +1538,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- 2. Mode Slow (Pink Theme — design.md Bright: #FF74BC, Deep: #E1529C) -->
             <div
               @click="chosenMode = 'slow'; handleStartAdventure(); playButtonPop()"
-              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#FF74BC] shadow-xs hover:shadow-xl hover:shadow-[#FF74BC]/15 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-[#FF74BC] shadow-xs hover:shadow-xl hover:shadow-[#FF74BC]/15 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden reveal-on-scroll delay-200"
             >
               <!-- Subtle Top Accent Hover Glow -->
               <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#FF74BC] to-[#E1529C] opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -1459,7 +1594,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- 3. Mode Kontras Tinggi (High Contrast Slate/Yellow Theme) -->
             <div
               @click="chosenMode = 'high_contrast'; handleStartAdventure(); playButtonPop()"
-              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-slate-800 shadow-xs hover:shadow-xl hover:shadow-slate-900/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-slate-800 shadow-xs hover:shadow-xl hover:shadow-slate-900/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden reveal-on-scroll delay-300"
             >
               <!-- Subtle Top Accent Hover Glow -->
               <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-slate-900 via-yellow-400 to-[#FFDC58] opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -1515,7 +1650,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
             <!-- 4. Mode Focus (Zen Emerald Green Theme) -->
             <div
               @click="chosenMode = 'focus'; handleStartAdventure(); playButtonPop()"
-              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-emerald-500 shadow-xs hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+              class="group bg-white rounded-3xl p-7 sm:p-8 border-2 border-slate-100 hover:border-emerald-500 shadow-xs hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden reveal-on-scroll delay-400"
             >
               <!-- Subtle Top Accent Hover Glow -->
               <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#74DC2E] to-[#54AA1B] opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -1593,7 +1728,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
           <DoodleOrnament name="dots-duo" :size="42" />
         </div>
 
-        <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10">
+        <div class="w-full max-w-[1440px] mx-auto space-y-12 relative z-10 reveal-zoom">
           
           <!-- Section Header with Carousel Navigation -->
           <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1897,7 +2032,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     </main>
 
     <!-- ==================== VIEW: DETAIL MATERI ==================== -->
-    <main v-else-if="currentNav === 'materi-detail' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-6 flex-1">
+    <main v-else-if="currentNav === 'materi-detail' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-24 sm:pt-28 pb-6 flex-1">
       <MateriDetailView
         :materi="activeMateriItem || materiList[0]"
         @back="navigateTo('materi')"
@@ -1906,7 +2041,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     </main>
 
     <!-- ==================== VIEW: PILIH MODE BELAJAR ==================== -->
-    <main v-else-if="currentNav === 'mode-select' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-6 flex-1">
+    <main v-else-if="currentNav === 'mode-select' && isAuthenticated" class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-24 sm:pt-28 pb-6 flex-1">
       <ModeSelectView
         :materi="activeMateriItem || materiList[0]"
         @back="navigateTo(modeSelectSource || 'materi')"
@@ -1965,7 +2100,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
     </main>
 
     <!-- ==================== VIEW: DEFAULT FALLBACK (AUTH GUARD) ==================== -->
-    <main v-else class="flex-1 flex items-center justify-center p-8 text-center">
+    <main v-else class="flex-1 flex items-center justify-center p-8 pt-24 text-center">
       <div class="max-w-md space-y-4 bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
         <div class="w-14 h-14 rounded-2xl bg-[#FFEFE6] text-[#FF7315] flex items-center justify-center mx-auto">
           <Lock class="w-7 h-7" />
