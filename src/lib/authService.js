@@ -51,8 +51,30 @@ function loadUserSession() {
         const meta = payload.user_metadata || {}
         const email = (payload.email || '').toLowerCase()
         const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
-        const isProInRegistry = Boolean(proRegistry[email]?.isPro)
-        const isPro = Boolean(payload.isPro || meta.is_pro || isProInRegistry || payload.role === 'admin' || email.includes('admin'))
+        const subscriber = proRegistry[email] || {}
+        const isAdminUser = payload.role === 'admin' || meta.role === 'admin' || email.includes('admin')
+        
+        let isPro = Boolean(payload.isPro || meta.is_pro || subscriber.isPro || isAdminUser)
+        let proExpiresAt = subscriber.expiresAt || payload.proExpiresAt || meta.pro_expires_at || null
+
+        // Check or initialize expiration date for non-admin PRO users
+        if (isPro && !isAdminUser) {
+          if (!proExpiresAt) {
+            const baseTime = subscriber.activatedAt ? new Date(subscriber.activatedAt).getTime() : Date.now()
+            proExpiresAt = new Date(baseTime + 30 * 24 * 60 * 60 * 1000).toISOString()
+            subscriber.expiresAt = proExpiresAt
+            subscriber.isPro = true
+            proRegistry[email] = subscriber
+            localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+          }
+
+          if (proExpiresAt && new Date() > new Date(proExpiresAt)) {
+            isPro = false
+            subscriber.isPro = false
+            proRegistry[email] = subscriber
+            localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+          }
+        }
 
         return {
           id: payload.sub || payload.id || payload.email,
@@ -62,7 +84,8 @@ function loadUserSession() {
           avatar: payload.avatar || (payload.role === 'admin' ? '🛡️' : '👧'),
           isPro,
           tier: isPro ? 'pro' : 'free',
-          proPlanName: proRegistry[email]?.planName || (isPro ? 'Inkluvia Premium' : null),
+          proPlanName: subscriber.planName || payload.proPlanName || (isPro ? 'Inkluvia Premium PRO' : null),
+          proExpiresAt,
           token,
           isSupabase: Boolean(payload.iss && payload.iss.includes('supabase'))
         }
@@ -137,7 +160,12 @@ function saveUserSession(user, token = null) {
 export const isAuthenticated = computed(() => Boolean(currentUser.value && currentUser.value.token))
 export const isAdmin = computed(() => currentUser.value?.role === 'admin')
 export const isStudent = computed(() => currentUser.value?.role === 'user')
-export const isProUser = computed(() => Boolean(currentUser.value?.isPro || currentUser.value?.role === 'admin'))
+export const isProUser = computed(() => {
+  if (!currentUser.value) return false
+  if (currentUser.value.role === 'admin' || (currentUser.value.email || '').includes('admin')) return true
+  const info = getProStatusInfo(currentUser.value)
+  return info.isPro
+})
 export const currentToken = computed(() => currentUser.value?.token || getStoredToken())
 
 /**
@@ -433,18 +461,35 @@ export async function updateUserProfile({ name, avatar }) {
  * Setelah pembayaran Xendit Sandbox berhasil
  */
 export async function upgradeCurrentUserToPro({
-  planName = 'Inkluvia Premium',
+  planName = 'Inkluvia Premium PRO',
   invoiceId = '',
-  paymentMethod = 'Xendit Sandbox'
+  paymentMethod = 'Xendit Sandbox',
+  interval = 'bulan',
+  durationDays = null
 } = {}) {
   if (!currentUser.value) return null
 
+  let days = durationDays
+  if (!days) {
+    const nameLower = planName.toLowerCase()
+    if (interval === 'tahun' || nameLower.includes('tahun') || nameLower.includes('yearly') || nameLower.includes('annual')) {
+      days = 365
+    } else {
+      days = 30
+    }
+  }
+
+  const now = new Date()
+  const expiresDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+  const proExpiresAt = expiresDate.toISOString()
+
   currentUser.value.isPro = true
   currentUser.value.tier = 'pro'
-  currentUser.value.proActivatedAt = new Date().toISOString()
+  currentUser.value.proActivatedAt = now.toISOString()
+  currentUser.value.proExpiresAt = proExpiresAt
   currentUser.value.proPlanName = planName
 
-  // Generate token JWT baru dengan klaim PRO
+  // Generate token JWT baru dengan klaim PRO & masa berlaku
   const token = signJWT({
     id: currentUser.value.id || currentUser.value.email,
     name: currentUser.value.name,
@@ -452,7 +497,8 @@ export async function upgradeCurrentUserToPro({
     role: currentUser.value.role || 'user',
     avatar: currentUser.value.avatar,
     isPro: true,
-    tier: 'pro'
+    tier: 'pro',
+    proExpiresAt
   })
 
   currentUser.value.token = token
@@ -468,7 +514,8 @@ export async function upgradeCurrentUserToPro({
       planName,
       invoiceId,
       paymentMethod,
-      activatedAt: new Date().toISOString()
+      activatedAt: now.toISOString(),
+      expiresAt: proExpiresAt
     }
     localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
   } catch (e) {
@@ -483,7 +530,8 @@ export async function upgradeCurrentUserToPro({
           is_pro: true,
           tier: 'pro',
           pro_plan: planName,
-          pro_invoice_id: invoiceId
+          pro_invoice_id: invoiceId,
+          pro_expires_at: proExpiresAt
         }
       })
     } catch (e) {
@@ -492,6 +540,114 @@ export async function upgradeCurrentUserToPro({
   }
 
   return currentUser.value
+}
+
+/**
+ * Helper untuk memformat tanggal ke Bahasa Indonesia (Contoh: 28 Oktober 2026)
+ */
+export function formatIndonesianDate(dateInput) {
+  if (!dateInput) return '-'
+  try {
+    const d = new Date(dateInput)
+    if (isNaN(d.getTime())) return '-'
+    const day = d.getDate()
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ]
+    const month = months[d.getMonth()]
+    const year = d.getFullYear()
+    return `${day} ${month} ${year}`
+  } catch (e) {
+    return '-'
+  }
+}
+
+/**
+ * Helper terpusat untuk mengambil status PRO & tanggal kadaluarsa pengguna
+ */
+export function getProStatusInfo(user = currentUser.value) {
+  if (!user) {
+    return { isPro: false, isExpired: false, label: 'Belum Log In', expiresText: '-', daysLeft: 0, expiresIso: null }
+  }
+
+  if (user.role === 'admin' || (user.email || '').includes('admin')) {
+    return {
+      isPro: true,
+      isExpired: false,
+      label: 'Akses Utama Administrator',
+      expiresText: 'Akses Selamanya (Admin)',
+      daysLeft: 9999,
+      expiresIso: null
+    }
+  }
+
+  const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+  const emailKey = (user.email || '').toLowerCase()
+  const subscriber = proRegistry[emailKey] || {}
+  let expIso = user.proExpiresAt || subscriber.expiresAt
+
+  if (!expIso) {
+    if (user.isPro) {
+      // Inisialisasi default 30 hari jika belum tersimpan
+      const defaultExp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      user.proExpiresAt = defaultExp
+      subscriber.expiresAt = defaultExp
+      subscriber.isPro = true
+      proRegistry[emailKey] = subscriber
+      localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+
+      return {
+        isPro: true,
+        isExpired: false,
+        label: user.proPlanName || 'Inkluvia Premium PRO',
+        expiresText: formatIndonesianDate(defaultExp),
+        daysLeft: 30,
+        expiresIso: defaultExp
+      }
+    }
+
+    return {
+      isPro: false,
+      isExpired: false,
+      label: 'Inkluvia Free Access',
+      expiresText: '-',
+      daysLeft: 0,
+      expiresIso: null
+    }
+  }
+
+  const expDate = new Date(expIso)
+  const now = new Date()
+  const diffMs = expDate.getTime() - now.getTime()
+  const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+
+  if (diffMs <= 0) {
+    // MASA BERLANGGANAN EXPIRING / TELAH KADALUARSA
+    user.isPro = false
+    user.tier = 'free'
+    subscriber.isPro = false
+    proRegistry[emailKey] = subscriber
+    localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+
+    return {
+      isPro: false,
+      isExpired: true,
+      label: 'Inkluvia Free Access',
+      expiresText: formatIndonesianDate(expIso),
+      daysLeft: 0,
+      expiresIso: expIso
+    }
+  }
+
+  return {
+    isPro: true,
+    isExpired: false,
+    label: user.proPlanName || subscriber.planName || 'Inkluvia Premium PRO',
+    expiresText: formatIndonesianDate(expIso),
+    daysLeft: diffDays,
+    expiresIso: expIso
+  }
 }
 
 // Re-export JWT utilities for inspection / API client usage

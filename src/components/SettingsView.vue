@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { currentUser, updateUserProfile, isAdmin } from '../lib/authService'
+import { ref, watch, onMounted, computed } from 'vue'
+import { currentUser, updateUserProfile, isAdmin, getProStatusInfo } from '../lib/authService'
 import {
   ArrowLeft,
   User,
@@ -38,6 +38,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['back', 'navigate', 'logout', 'updated'])
+
+// Subscription & Account Status Info
+const proStatus = computed(() => getProStatusInfo(currentUser.value))
 
 // Tab state: 'profile' | 'theme' | 'accessibility'
 const activeTab = ref(props.initialTab || 'profile')
@@ -507,21 +510,70 @@ onMounted(async () => {
             <div class="my-5 border-t border-slate-100"></div>
 
             <!-- Quick Meta Status -->
-            <div class="space-y-2 text-xs">
+            <div class="space-y-2.5 text-xs">
               <div class="flex items-center justify-between text-slate-500">
                 <span class="font-medium">Status Akun:</span>
-                <span class="font-bold text-emerald-600 flex items-center gap-1">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Aktif & Terverifikasi
+                <span
+                  class="font-bold flex items-center gap-1.5"
+                  :class="proStatus.isPro || isAdmin ? 'text-emerald-600' : (proStatus.isExpired ? 'text-rose-600' : 'text-slate-600')"
+                >
+                  <span
+                    class="w-2 h-2 rounded-full animate-pulse"
+                    :class="proStatus.isPro || isAdmin ? 'bg-emerald-500' : (proStatus.isExpired ? 'bg-rose-500' : 'bg-slate-400')"
+                  ></span>
+                  {{ proStatus.isPro || isAdmin ? 'Aktif & Terverifikasi' : (proStatus.isExpired ? 'Masa PRO Berakhir' : 'Akun Gratis') }}
                 </span>
               </div>
+
               <div class="flex items-center justify-between text-slate-500">
                 <span class="font-medium">Tipe Layanan:</span>
-                <span v-if="currentUser?.isPro || isAdmin" class="font-black text-amber-600 flex items-center gap-1">
+                <span v-if="proStatus.isPro || isAdmin" class="font-black text-amber-600 flex items-center gap-1">
                   <span>👑</span>
                   <span>Inkluvia Premium PRO</span>
                 </span>
+                <span v-else-if="proStatus.isExpired" class="font-bold text-rose-600 flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>PRO Kadaluarsa</span>
+                </span>
                 <span v-else class="font-bold text-[#0F3261]">Inkluvia Free Access</span>
+              </div>
+
+              <!-- Masa Berlaku / Tanggal Expiry PRO -->
+              <div class="flex flex-col gap-1 pt-2 border-t border-slate-100">
+                <div class="flex items-center justify-between text-slate-500">
+                  <span class="font-medium">Masa Berlaku PRO:</span>
+                  <span v-if="isAdmin" class="font-bold text-emerald-600">
+                    Akses Selamanya (Admin)
+                  </span>
+                  <span v-else-if="proStatus.isPro" class="font-black text-[#0F3261] flex items-center gap-1">
+                    <span>📅 {{ proStatus.expiresText }}</span>
+                  </span>
+                  <span v-else-if="proStatus.isExpired" class="font-black text-rose-600 flex items-center gap-1">
+                    <span>🔴 Habis pada {{ proStatus.expiresText }}</span>
+                  </span>
+                  <span v-else class="font-semibold text-slate-400">
+                    Belum Berlangganan
+                  </span>
+                </div>
+
+                <!-- Sisa Hari Indicator (if PRO active) -->
+                <div v-if="proStatus.isPro && !isAdmin" class="flex justify-end">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                    <Sparkles class="w-3 h-3 text-[#FF7315]" />
+                    <span>Sisa {{ proStatus.daysLeft }} Hari Lagi</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Quick Renewal / Upgrade CTA for Non-PRO or Expired -->
+              <div v-if="!proStatus.isPro && !isAdmin" class="pt-2">
+                <button
+                  @click="emit('navigate', 'harga')"
+                  class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-[#FF7315] via-[#FF8A3D] to-[#E86105] hover:opacity-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md transition active:scale-95 cursor-pointer"
+                >
+                  <Sparkles class="w-4 h-4 text-amber-200" />
+                  <span>{{ proStatus.isExpired ? 'Perpanjang Langganan PRO' : 'Upgrade ke Premium PRO' }}</span>
+                </button>
               </div>
             </div>
           </div>

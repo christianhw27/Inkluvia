@@ -2028,6 +2028,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
       <MateriView
         :search-query="searchQuery"
         @open-detail="handleOpenDetail"
+        @navigate-harga="navigateTo('harga')"
       />
     </main>
 

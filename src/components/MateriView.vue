@@ -10,14 +10,26 @@ import {
   Video
 } from '@lucide/vue'
 import DoodleOrnament from './DoodleOrnament.vue'
-import { currentUser, isAdmin } from '../lib/authService'
+import { currentUser, isAdmin, isProUser } from '../lib/authService'
 import { playButtonPop } from '../lib/soundEffects'
 
 const props = defineProps({
   searchQuery: { type: String, default: '' }
 })
 
-const emit = defineEmits(['openDetail'])
+const emit = defineEmits(['openDetail', 'navigate-harga'])
+
+const showProLockedModal = ref(false)
+
+const handleOpenItem = (item) => {
+  playButtonPop()
+  const isProItem = (item.badge || '').toLowerCase() === 'pro' || item.isProOnly
+  if (isProItem && !isProUser.value) {
+    showProLockedModal.value = true
+    return
+  }
+  emit('openDetail', item)
+}
 
 // Filter States
 const selectedJenjang = ref('Semua')
@@ -385,10 +397,12 @@ const resetFilters = () => {
               <!-- Bottom Row: CTA Button -->
               <div class="flex justify-end pt-3 border-t border-slate-100">
                 <button
-                  @click="emit('openDetail', item); playButtonPop()"
-                  class="btn-tactile-orange px-6 py-3 text-xs font-extrabold flex items-center gap-2 cursor-pointer shrink-0 shadow-md"
+                  @click="handleOpenItem(item)"
+                  class="px-6 py-3 text-xs font-extrabold flex items-center gap-2 cursor-pointer shrink-0 shadow-md transition active:scale-95 rounded-full"
+                  :class="(item.badge || '').toLowerCase() === 'pro' && !isProUser && !isAdmin ? 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-600' : 'btn-tactile-orange'"
                 >
                   <span v-if="(item.badge || '').toLowerCase() === 'pro' && (currentUser?.isPro || isAdmin)">Mulai Materi PRO ⭐</span>
+                  <span v-else-if="(item.badge || '').toLowerCase() === 'pro'">🔒 Materi Khusus PRO</span>
                   <span v-else>Mulai Petualangan</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>
@@ -401,5 +415,48 @@ const resetFilters = () => {
       </div>
 
     </div>
+
+    <!-- ==================== PRO LOCKED MODAL ==================== -->
+    <Teleport to="body">
+      <div v-if="showProLockedModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 text-center shadow-2xl border-4 border-amber-300 animate-soft-pop relative">
+          <button
+            @click="showProLockedModal = false"
+            class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+          >
+            ✕
+          </button>
+
+          <div class="w-16 h-16 rounded-2xl bg-amber-100 text-[#FF7315] flex items-center justify-center mx-auto text-3xl shadow-inner border border-amber-200">
+            👑
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="text-xl sm:text-2xl font-black text-[#0F3261]">
+              Materi Khusus Member PRO
+            </h3>
+            <p class="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+              Masa berlangganan Inkluvia Premium PRO Anda belum aktif atau telah berakhir. Berlangganan kembali untuk membuka akses penuh ke seluruh materi eksklusif ini!
+            </p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              @click="showProLockedModal = false"
+              class="w-full sm:flex-1 py-3 px-4 rounded-full border-2 border-slate-200 text-slate-600 font-extrabold text-xs hover:bg-slate-50 transition cursor-pointer"
+            >
+              Nanti Saja
+            </button>
+            <button
+              @click="showProLockedModal = false; emit('navigate-harga')"
+              class="w-full sm:flex-1 btn-tactile-orange py-3 px-4 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Sparkles class="w-4 h-4 text-amber-200" />
+              <span>Berlangganan PRO</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
