@@ -26,7 +26,10 @@ import {
   Medal,
   ChevronRight,
   User,
-  Star
+  Star,
+  PlayCircle,
+  Eye,
+  Target
 } from '@lucide/vue'
 import { currentUser } from '../lib/authService'
 import { RELIABLE_MODE_VIDEOS, sanitizeVideoUrl } from '../lib/materiService'
@@ -461,10 +464,10 @@ onMounted(async () => {
               : 'bg-orange-50 text-[#FF7315] border-orange-200'
           ]"
         >
-          <Sparkles v-if="currentMode === 'standard'" class="w-3.5 h-3.5" />
-          <span v-else-if="currentMode === 'slow'">🐢</span>
-          <span v-else-if="currentMode === 'high_contrast'">👁️</span>
-          <Sun v-else class="w-3.5 h-3.5" />
+          <PlayCircle v-if="currentMode === 'standard'" class="w-3.5 h-3.5" />
+          <Clock v-else-if="currentMode === 'slow'" class="w-3.5 h-3.5" />
+          <Eye v-else-if="currentMode === 'high_contrast'" class="w-3.5 h-3.5" />
+          <Target v-else class="w-3.5 h-3.5" />
           <span>
             Mode: {{
               currentMode === 'standard' ? 'Standar' :
@@ -553,17 +556,21 @@ onMounted(async () => {
           <!-- Mode Indicator Box in Sidebar -->
           <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
             <p class="font-bold text-slate-700">Mode Belajar Aktif:</p>
-            <p v-if="currentMode === 'standard'" class="text-[#3587CE] font-semibold">
-              ✨ Standar Mode: Pengalaman belajar interaktif dengan animasi dan audio jernih.
+            <p v-if="currentMode === 'standard'" class="text-[#3587CE] font-semibold flex items-center gap-1.5">
+              <PlayCircle class="w-4 h-4 shrink-0 text-[#3587CE]" />
+              <span>Standar Mode: Pengalaman belajar interaktif dengan animasi dan audio jernih.</span>
             </p>
-            <p v-else-if="currentMode === 'slow'" class="text-purple-700 font-semibold">
-              🐢 Slow Mode: Artikulasi bertahap dan jeda terukur untuk pemahaman optimal.
+            <p v-else-if="currentMode === 'slow'" class="text-purple-700 font-semibold flex items-center gap-1.5">
+              <Clock class="w-4 h-4 shrink-0 text-purple-600" />
+              <span>Slow Mode: Artikulasi bertahap dan jeda terukur untuk pemahaman optimal.</span>
             </p>
-            <p v-else-if="currentMode === 'high_contrast'" class="text-slate-900 font-bold">
-              👁️ High Contrast Mode: Teks besar kontras tinggi untuk kenyamanan penglihatan.
+            <p v-else-if="currentMode === 'high_contrast'" class="text-slate-900 font-bold flex items-center gap-1.5">
+              <Eye class="w-4 h-4 shrink-0 text-yellow-500" />
+              <span>High Contrast Mode: Teks besar kontras tinggi untuk kenyamanan penglihatan.</span>
             </p>
-            <p v-else class="text-[#FF7315] font-semibold">
-              ☀️ Focus Mode: Tampilan sederhana, bebas distraksi, dan tempo tenang.
+            <p v-else class="text-[#FF7315] font-semibold flex items-center gap-1.5">
+              <Target class="w-4 h-4 shrink-0 text-[#FF7315]" />
+              <span>Focus Mode: Tampilan sederhana, bebas distraksi, dan tempo tenang.</span>
             </p>
           </div>
         </div>

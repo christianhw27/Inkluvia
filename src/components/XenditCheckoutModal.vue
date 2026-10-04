@@ -19,7 +19,7 @@ import {
   RefreshCw
 } from '@lucide/vue'
 import { createSandboxInvoice, simulateSandboxPayment, checkInvoiceStatus } from '../lib/xenditService'
-import { currentUser } from '../lib/authService'
+import { currentUser, isProUser } from '../lib/authService'
 import { playButtonPop, playMascotChime } from '../lib/soundEffects'
 
 const props = defineProps({
@@ -100,6 +100,12 @@ function startStatusPolling() {
 }
 
 const initInvoice = async () => {
+  if (isProUser.value) {
+    alert('Akun Anda sudah memiliki status Inkluvia Premium PRO yang aktif!')
+    emit('close')
+    return
+  }
+
   isSuccess.value = false
   isProcessing.value = false
   isLoadingInvoice.value = true

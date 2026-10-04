@@ -51,6 +51,11 @@ const handleChoosePlan = (plan) => {
       return
     }
 
+    if (isProUser.value) {
+      alert('Akun Anda sudah memiliki status Inkluvia Premium PRO yang aktif! Anda tidak perlu membeli lagi.')
+      return
+    }
+
     const premium = pricingConfig.value.premiumTier
     const amount = isYearly.value ? premium.yearlyPrice : premium.monthlyPrice
     const interval = isYearly.value ? 'tahun' : 'bulan'
@@ -256,7 +261,7 @@ const faqs = [
 
           <div>
             <button
-              v-if="currentUser?.isPro"
+              v-if="isProUser"
               disabled
               class="w-full py-4 px-6 rounded-full font-black text-sm flex items-center justify-center gap-2 cursor-default bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-900 shadow-md border-2 border-amber-400"
             >

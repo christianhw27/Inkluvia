@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ArrowLeft, ArrowRight, Check } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, Check, PlayCircle, Clock, Eye, Target } from '@lucide/vue'
 import DoodleOrnament from './DoodleOrnament.vue'
 
 const props = defineProps({
@@ -12,7 +12,7 @@ const props = defineProps({
 
 const emit = defineEmits(['back', 'selectMode'])
 
-const activeMode = ref('standard') // 'standard' | 'focus'
+const activeMode = ref('standard') // 'standard' | 'slow' | 'high_contrast' | 'focus'
 
 const handleContinue = () => {
   emit('selectMode', activeMode.value)
@@ -95,12 +95,8 @@ onMounted(() => {
             <Check class="w-4 h-4" />
           </div>
 
-          <div class="w-28 h-24 flex items-center justify-center mb-3">
-            <img
-              src="/Icon_Standar Mode.png"
-              alt="Standard Mode Icon"
-              class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
-            />
+          <div class="w-20 h-20 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <PlayCircle class="w-10 h-10 text-[#3587CE]" />
           </div>
 
           <div class="space-y-2 w-full">
@@ -138,8 +134,8 @@ onMounted(() => {
             <Check class="w-4 h-4" />
           </div>
 
-          <div class="w-28 h-24 flex items-center justify-center mb-3">
-            <span class="text-4xl">🐢</span>
+          <div class="w-20 h-20 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Clock class="w-10 h-10 text-purple-600" />
           </div>
 
           <div class="space-y-2 w-full">
@@ -177,8 +173,8 @@ onMounted(() => {
             <Check class="w-4 h-4 font-bold" />
           </div>
 
-          <div class="w-28 h-24 flex items-center justify-center mb-3">
-            <span class="text-4xl">👁️‍🗨️</span>
+          <div class="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Eye class="w-10 h-10 text-yellow-400" />
           </div>
 
           <div class="space-y-2 w-full">
@@ -216,12 +212,8 @@ onMounted(() => {
             <Check class="w-4 h-4" />
           </div>
 
-          <div class="w-28 h-24 flex items-center justify-center mb-3">
-            <img
-              src="/Icon_Focus Mode.png"
-              alt="Focus Mode Icon"
-              class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
-            />
+          <div class="w-20 h-20 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Target class="w-10 h-10 text-[#FF7315]" />
           </div>
 
           <div class="space-y-2 w-full">

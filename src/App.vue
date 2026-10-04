@@ -39,7 +39,12 @@ import {
   Edit3,
   MessageSquareHeart,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  PlayCircle,
+  Eye,
+  Film,
+  PauseCircle,
+  Maximize2
 } from '@lucide/vue'
 import MateriView from './components/MateriView.vue'
 import MateriDetailView from './components/MateriDetailView.vue'
@@ -59,6 +64,7 @@ import {
   currentUser,
   isAuthenticated,
   isAdmin,
+  isProUser,
   logoutUser
 } from './lib/authService'
 import {
@@ -125,7 +131,7 @@ const filteredLandingModules = computed(() => {
 
 const handleModuleClick = (mod) => {
   playButtonPop()
-  const userHasAccess = mod.isFree || currentUser.value?.isPro || isAdmin.value
+  const userHasAccess = mod.isFree || isProUser.value || isAdmin.value
   if (userHasAccess) {
     handleOpenDetail(mod.originalItem || mod)
   } else {
@@ -328,6 +334,11 @@ const handleAuthenticated = (user) => {
 
 const updateHashAndStorage = (route) => {
   if (route && ALL_KNOWN_ROUTES.includes(route)) {
+    const currentHash = window.location.hash || ''
+    if (currentHash.includes('access_token') || currentHash.includes('type=') || currentHash.includes('error=')) {
+      sessionStorage.setItem('inkluvia_current_nav', route)
+      return
+    }
     if (window.location.hash !== `#${route}`) {
       window.history.replaceState(null, '', `#${route}`)
     }
@@ -721,14 +732,14 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                     {{ currentUser?.name || 'Pengguna' }}
                   </span>
                   <span
-                    v-if="currentUser?.isPro || isAdmin"
+                    v-if="isProUser || isAdmin"
                     class="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-400 text-slate-900 border border-amber-300 shadow-2xs shrink-0"
                   >
                     👑 PRO
                   </span>
                 </div>
                 <span class="text-[10px] sm:text-[11px] font-extrabold text-slate-400 leading-tight">
-                  {{ isAdmin ? 'Administrator' : (currentUser?.isPro ? 'Member PRO' : 'Pengaturan Akun') }}
+                  {{ isAdmin ? 'Administrator' : (isProUser ? 'Member PRO' : 'Pengaturan Akun') }}
                 </span>
               </div>
             </button>
@@ -1256,7 +1267,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                   <span v-if="mod.isFree" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-500 text-white shadow-md flex items-center gap-1">
                     ⭐ GRATIS
                   </span>
-                  <span v-else-if="currentUser?.isPro || isAdmin" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 shadow-md flex items-center gap-1">
+                  <span v-else-if="isProUser || isAdmin" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 shadow-md flex items-center gap-1">
                     👑 PRO AKTIF
                   </span>
                   <span v-else class="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md flex items-center gap-1">
@@ -1272,7 +1283,7 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 </div>
 
                 <!-- Pro Lock Glassmorphism Blur Overlay (Hanya jika belum PRO) -->
-                <div v-if="mod.isPro && !currentUser?.isPro && !isAdmin" class="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                <div v-if="mod.isPro && !isProUser && !isAdmin" class="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
                   <div class="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full text-[11px] font-extrabold text-amber-600 border border-amber-200 shadow-md flex items-center gap-1.5">
                     <Lock class="w-3.5 h-3.5 text-amber-600" />
                     <span>Konten Premium</span>
@@ -1308,15 +1319,15 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                     @click="handleModuleClick(mod)"
                     :class="[
                       'px-4 py-2 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer rounded-full transition active:scale-95 shadow-sm',
-                      (mod.isFree || currentUser?.isPro || isAdmin)
+                      (mod.isFree || isProUser || isAdmin)
                         ? 'btn-tactile-orange'
                         : 'bg-gradient-to-r from-amber-500 to-[#FF7315] text-white hover:brightness-110'
                     ]"
                   >
                     <span v-if="mod.isFree">Coba Demo Gratis</span>
-                    <span v-else-if="currentUser?.isPro || isAdmin">Mulai Belajar PRO ⭐</span>
+                    <span v-else-if="isProUser || isAdmin">Mulai Belajar PRO ⭐</span>
                     <span v-else>Buka Akses PRO</span>
-                    <ArrowRight v-if="mod.isFree || currentUser?.isPro || isAdmin" class="w-3.5 h-3.5" />
+                    <ArrowRight v-if="mod.isFree || isProUser || isAdmin" class="w-3.5 h-3.5" />
                     <Lock v-else class="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1461,8 +1472,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 <!-- Header: Icon + Title + Theme Badge -->
                 <div class="flex items-center justify-between gap-4 mb-4">
                   <div class="flex items-center gap-3.5">
-                    <div class="w-13 h-13 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center p-2 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
-                      <img src="/Icon_Standar Mode.png" alt="Mode Standar" class="max-h-full max-w-full object-contain" />
+                    <div class="w-13 h-13 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <PlayCircle class="w-7 h-7 text-[#3587CE]" />
                     </div>
                     <div>
                       <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#3587CE] transition-colors">
@@ -1483,20 +1494,23 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <!-- Key Feature Tags -->
                 <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors">
-                    🎬 Animasi Interaktif
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors inline-flex items-center gap-1.5">
+                    <Film class="w-3.5 h-3.5 text-[#3587CE]" />
+                    <span>Animasi Interaktif</span>
                   </span>
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors">
-                    🔊 Narasi Audio Penuh
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-[#3587CE] transition-colors inline-flex items-center gap-1.5">
+                    <Volume2 class="w-3.5 h-3.5 text-[#3587CE]" />
+                    <span>Narasi Audio Penuh</span>
                   </span>
                 </div>
               </div>
 
               <!-- Footer: Target Pengguna + Hover Action CTA -->
               <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
-                  <span class="ml-1.5 text-slate-600 font-medium">Siswa kebutuhan umum / reguler</span>
+                <div class="flex items-center gap-1.5">
+                  <Target class="w-4 h-4 text-[#0F3261] shrink-0" />
+                  <span class="font-bold text-[#0F3261]">Sasaran:</span>
+                  <span class="text-slate-600 font-medium">Siswa kebutuhan umum / reguler</span>
                 </div>
                 <span class="font-black text-[#3587CE] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                   <span>Coba</span>
@@ -1517,8 +1531,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 <!-- Header: Icon + Title + Theme Badge -->
                 <div class="flex items-center justify-between gap-4 mb-4">
                   <div class="flex items-center gap-3.5">
-                    <div class="w-13 h-13 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
-                      🐢
+                    <div class="w-13 h-13 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <Clock class="w-7 h-7 text-[#E1529C]" />
                     </div>
                     <div>
                       <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#E1529C] transition-colors">
@@ -1539,20 +1553,23 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <!-- Key Feature Tags -->
                 <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors">
-                    ⏱️ Artikulasi Bertahap
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors inline-flex items-center gap-1.5">
+                    <Clock class="w-3.5 h-3.5 text-[#E1529C]" />
+                    <span>Artikulasi Bertahap</span>
                   </span>
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors">
-                    ⏸️ Jeda Retensi Nyaman
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-pink-50 group-hover:text-[#E1529C] transition-colors inline-flex items-center gap-1.5">
+                    <PauseCircle class="w-3.5 h-3.5 text-[#E1529C]" />
+                    <span>Jeda Retensi Nyaman</span>
                   </span>
                 </div>
               </div>
 
               <!-- Footer: Target Pengguna + Hover Action CTA -->
               <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
-                  <span class="ml-1.5 text-slate-600 font-medium">Disabilitas intelektual & atensi</span>
+                <div class="flex items-center gap-1.5">
+                  <Target class="w-4 h-4 text-[#0F3261] shrink-0" />
+                  <span class="font-bold text-[#0F3261]">Sasaran:</span>
+                  <span class="text-slate-600 font-medium">Disabilitas intelektual & atensi</span>
                 </div>
                 <span class="font-black text-[#E1529C] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                   <span>Coba</span>
@@ -1573,8 +1590,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 <!-- Header: Icon + Title + Theme Badge -->
                 <div class="flex items-center justify-between gap-4 mb-4">
                   <div class="flex items-center gap-3.5">
-                    <div class="w-13 h-13 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl text-yellow-400 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
-                      👁️
+                    <div class="w-13 h-13 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <Eye class="w-7 h-7 text-yellow-400" />
                     </div>
                     <div>
                       <h3 class="text-xl font-black text-[#0F3261] group-hover:text-slate-900 transition-colors">
@@ -1595,20 +1612,23 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <!-- Key Feature Tags -->
                 <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors">
-                    🔲 Kontras Warna Tegas
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors inline-flex items-center gap-1.5">
+                    <Maximize2 class="w-3.5 h-3.5 text-yellow-500" />
+                    <span>Kontras Warna Tegas</span>
                   </span>
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors">
-                    🔍 Durasi Ringkas 4–5 Mnt
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-yellow-400 transition-colors inline-flex items-center gap-1.5">
+                    <Search class="w-3.5 h-3.5 text-yellow-500" />
+                    <span>Durasi Ringkas 4–5 Mnt</span>
                   </span>
                 </div>
               </div>
 
               <!-- Footer: Target Pengguna + Hover Action CTA -->
               <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
-                  <span class="ml-1.5 text-slate-600 font-medium">Hambatan penglihatan (Low Vision)</span>
+                <div class="flex items-center gap-1.5">
+                  <Target class="w-4 h-4 text-[#0F3261] shrink-0" />
+                  <span class="font-bold text-[#0F3261]">Sasaran:</span>
+                  <span class="text-slate-600 font-medium">Hambatan penglihatan (Low Vision)</span>
                 </div>
                 <span class="font-black text-slate-900 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                   <span>Coba</span>
@@ -1629,8 +1649,8 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
                 <!-- Header: Icon + Title + Theme Badge -->
                 <div class="flex items-center justify-between gap-4 mb-4">
                   <div class="flex items-center gap-3.5">
-                    <div class="w-13 h-13 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center p-2 shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
-                      <img src="/Icon_Focus Mode.png" alt="Mode Focus" class="max-h-full max-w-full object-contain" />
+                    <div class="w-13 h-13 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-2xs">
+                      <Target class="w-7 h-7 text-[#54AA1B]" />
                     </div>
                     <div>
                       <h3 class="text-xl font-black text-[#0F3261] group-hover:text-[#54AA1B] transition-colors">
@@ -1651,20 +1671,23 @@ watch([currentNav, isAuthenticated], ([newNav, isAuth]) => {
 
                 <!-- Key Feature Tags -->
                 <div class="flex flex-wrap gap-2 mt-4">
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors">
-                    🧘 Stimulasi Minimalis
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors inline-flex items-center gap-1.5">
+                    <Sparkles class="w-3.5 h-3.5 text-[#54AA1B]" />
+                    <span>Stimulasi Minimalis</span>
                   </span>
-                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors">
-                    🎯 Inti Materi Langsung
+                  <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-800 transition-colors inline-flex items-center gap-1.5">
+                    <Target class="w-3.5 h-3.5 text-[#54AA1B]" />
+                    <span>Inti Materi Langsung</span>
                   </span>
                 </div>
               </div>
 
               <!-- Footer: Target Pengguna + Hover Action CTA -->
               <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <span class="font-bold text-[#0F3261]">🎯 Sasaran:</span>
-                  <span class="ml-1.5 text-slate-600 font-medium">Spektrum autisme & gangguan atensi</span>
+                <div class="flex items-center gap-1.5">
+                  <Target class="w-4 h-4 text-[#0F3261] shrink-0" />
+                  <span class="font-bold text-[#0F3261]">Sasaran:</span>
+                  <span class="text-slate-600 font-medium">Spektrum autisme & gangguan atensi</span>
                 </div>
                 <span class="font-black text-[#54AA1B] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                   <span>Coba</span>

@@ -24,10 +24,15 @@ const emit = defineEmits(['openDetail', 'navigate-harga'])
 
 const showProLockedModal = ref(false)
 
+const isItemPro = (item) => {
+  if (!item) return false
+  const b = (item.badge || '').toLowerCase()
+  return b === 'pro' || b === 'premium' || Boolean(item.isProOnly)
+}
+
 const handleOpenItem = (item) => {
   playButtonPop()
-  const isProItem = (item.badge || '').toLowerCase() === 'pro' || item.isProOnly
-  if (isProItem && !isProUser.value) {
+  if (isItemPro(item) && !isProUser.value) {
     showProLockedModal.value = true
     return
   }
@@ -444,7 +449,7 @@ const resetFilters = () => {
               />
               <!-- Badge Gratis / Pro -->
               <span
-                v-if="(item.badge || '').toLowerCase() === 'pro' && (currentUser?.isPro || isAdmin)"
+                v-if="isItemPro(item) && (currentUser?.isPro || isAdmin)"
                 class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black text-slate-900 shadow-md bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 border border-amber-300 flex items-center gap-1"
               >
                 <span>👑 PRO (AKSES AKTIF)</span>
@@ -452,9 +457,9 @@ const resetFilters = () => {
               <span
                 v-else
                 class="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-black text-white shadow-md"
-                :style="(item.badge || '').toLowerCase() === 'pro' ? 'background: linear-gradient(135deg, #d97706, #b45309);' : 'background: linear-gradient(135deg, #10b981, #059669);'"
+                :style="isItemPro(item) ? 'background: linear-gradient(135deg, #d97706, #b45309);' : 'background: linear-gradient(135deg, #10b981, #059669);'"
               >
-                {{ (item.badge || '').toLowerCase() === 'pro' ? '🔒 PRO' : '⭐ GRATIS' }}
+                {{ isItemPro(item) ? '🔒 PRO' : '⭐ GRATIS' }}
               </span>
             </div>
 
@@ -519,10 +524,10 @@ const resetFilters = () => {
                 <button
                   @click="handleOpenItem(item)"
                   class="px-6 py-3 text-xs font-extrabold flex items-center gap-2 cursor-pointer shrink-0 shadow-md transition active:scale-95 rounded-full"
-                  :class="(item.badge || '').toLowerCase() === 'pro' && !isProUser && !isAdmin ? 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-600' : 'btn-tactile-orange'"
+                  :class="isItemPro(item) && !isProUser && !isAdmin ? 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-600' : 'btn-tactile-orange'"
                 >
-                  <span v-if="(item.badge || '').toLowerCase() === 'pro' && (currentUser?.isPro || isAdmin)">Mulai Materi PRO ⭐</span>
-                  <span v-else-if="(item.badge || '').toLowerCase() === 'pro'">🔒 Materi Khusus PRO</span>
+                  <span v-if="isItemPro(item) && (currentUser?.isPro || isAdmin)">Mulai Materi PRO ⭐</span>
+                  <span v-else-if="isItemPro(item)">🔒 Materi Khusus PRO</span>
                   <span v-else>Mulai Petualangan</span>
                   <ArrowRight class="w-4 h-4" />
                 </button>

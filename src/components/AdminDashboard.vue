@@ -18,7 +18,7 @@ import {
   FileVideo, CloudUpload, RefreshCw, Sparkles, TrendingUp, Users, Clock,
   ArrowUpRight, MoreVertical, Filter, Download, AlertCircle, Menu, ChevronDown,
   ArrowLeft, Save, ImagePlus, ListVideo, Tag, AlignLeft, Layers, HelpCircle,
-  Percent, DollarSign, RotateCcw, CreditCard
+  Percent, DollarSign, RotateCcw, CreditCard, PlayCircle, Target
 } from '@lucide/vue'
 
 const emit = defineEmits(['previewMateri', 'backToApp', 'openAuth'])
@@ -704,10 +704,10 @@ const navItems = [
                     ]"
                   >
                     <Layers v-if="key === 'general'" class="w-4 h-4" />
-                    <Sparkles v-else-if="key === 'standard'" class="w-4 h-4" />
-                    <span v-else-if="key === 'slow'">🐢</span>
-                    <span v-else-if="key === 'high_contrast'">👁️</span>
-                    <Sun v-else-if="key === 'focus'" class="w-4 h-4" />
+                    <PlayCircle v-else-if="key === 'standard'" class="w-4 h-4" />
+                    <Clock v-else-if="key === 'slow'" class="w-4 h-4" />
+                    <Eye v-else-if="key === 'high_contrast'" class="w-4 h-4" />
+                    <Target v-else-if="key === 'focus'" class="w-4 h-4" />
                     <HelpCircle v-else class="w-4 h-4" />
                     {{ label }}
                   </button>
@@ -779,12 +779,13 @@ const navItems = [
                           <input v-model="currentForm.duration" placeholder="± 5 menit" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none text-sm" />
                         </div>
                         <div>
-                          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Badge Label</label>
-                          <select v-model="currentForm.badge" class="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none">
-                            <option value="Gratis">Gratis</option>
-                            <option value="Baru">Baru</option>
-                            <option value="Premium">Premium</option>
-                            <option value="Populer">Populer</option>
+                          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Badge / Teks Status Akses</label>
+                          <select v-model="currentForm.badge" class="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#3DA5FF]">
+                            <option value="Gratis">⭐ Gratis (Akses Semua Siswa)</option>
+                            <option value="Pro">🔒 Pro (Khusus Berlangganan PRO)</option>
+                            <option value="Premium">🔒 Premium (Khusus Berlangganan PRO)</option>
+                            <option value="Baru">✨ Baru</option>
+                            <option value="Populer">🔥 Populer</option>
                           </select>
                         </div>
                       </div>
@@ -994,7 +995,9 @@ const navItems = [
                 <!-- ---- TAB 3: SLOW MODE ---- -->
                 <div v-if="activeFormTab === 'slow'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
                   <div class="flex items-center gap-3 p-4 rounded-xl bg-purple-50 border border-purple-100">
-                    <span class="text-2xl">🐢</span>
+                    <div class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+                      <Clock class="w-5 h-5 text-purple-600" />
+                    </div>
                     <div>
                       <h3 class="font-bold text-purple-900">2. Slow Mode</h3>
                       <p class="text-xs text-purple-700">Video & audio diputar 0.75x lebih lambat dengan penjelasan bertahap.</p>
@@ -1051,7 +1054,9 @@ const navItems = [
                 <!-- ---- TAB 4: HIGH CONTRAST MODE ---- -->
                 <div v-if="activeFormTab === 'high_contrast'" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
                   <div class="flex items-center gap-3 p-4 rounded-xl bg-slate-900 text-white">
-                    <span class="text-2xl">👁️‍🗨️</span>
+                    <div class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
+                      <Eye class="w-5 h-5 text-yellow-400" />
+                    </div>
                     <div>
                       <h3 class="font-bold text-yellow-400">3. High Contrast Mode</h3>
                       <p class="text-xs text-slate-300">Visual kontras tinggi, teks berukuran besar, dan ramah mata.</p>
@@ -1549,9 +1554,18 @@ const navItems = [
                       <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 4 Mode Ready
                     </span>
                   </div>
-                  <!-- Badge -->
+                  <!-- Badge Akses -->
                   <div class="col-span-1 hidden lg:block">
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FF7315] text-white">{{ item.badge || 'Gratis' }}</span>
+                    <span
+                      :class="[
+                        'px-2.5 py-1 rounded-full text-[10px] font-black inline-flex items-center gap-1 border shadow-xs',
+                        ['pro', 'premium'].includes((item.badge || '').toLowerCase())
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-[#FF7315] text-white border-orange-500'
+                      ]"
+                    >
+                      {{ ['pro', 'premium'].includes((item.badge || '').toLowerCase()) ? '🔒 PRO' : (item.badge || 'Gratis') }}
+                    </span>
                   </div>
                   <!-- Actions -->
                   <div class="col-span-3 lg:col-span-2 flex items-center gap-1.5 justify-end">

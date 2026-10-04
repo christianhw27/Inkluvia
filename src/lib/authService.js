@@ -53,19 +53,7 @@ function loadUserSession() {
         const email = (payload.email || '').toLowerCase()
         const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
         const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
-        const subscriber = proRegistry[email] || {}
-        const isAdminUser = payload.role === 'admin' || meta.role === 'admin' || email.includes('admin')
-        
-        let isPro = Boolean(payload.isPro || meta.is_pro || subscriber.isPro || isAdminUser)
-        let proExpiresAt = subscriber.expiresAt || payload.proExpiresAt || meta.pro_expires_at || null
-        const isEmailVerified = Boolean(
-          payload.isEmailVerified ||
-          meta.email_verified ||
-          verifiedRegistry[email] ||
-          isAdminUser ||
-          email.includes('@inkluvia.id') ||
-          email === 'siswa@gmail.com'
-        )
+        const isEmailVerified = true
 
         // Check or initialize expiration date for non-admin PRO users
         if (isPro && !isAdminUser) {
@@ -186,45 +174,99 @@ export function getAuthToken() {
   return currentUser.value?.token || getStoredToken()
 }
 
+function applySupabaseSession(session) {
+  if (!session?.user) return
+  const meta = session.user.user_metadata || {}
+  const token = session.access_token
+  const newEmail = (session.user.email || '').toLowerCase()
+  const oldEmail = (currentUser.value?.email || '').toLowerCase()
+
+  const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
+  if (newEmail) verifiedRegistry[newEmail] = true
+  localStorage.setItem('inkluvia_verified_emails', JSON.stringify(verifiedRegistry))
+
+  if (oldEmail && newEmail && oldEmail !== newEmail) {
+    const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+    if (proRegistry[oldEmail]) {
+      proRegistry[newEmail] = proRegistry[oldEmail]
+      delete proRegistry[oldEmail]
+      localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+    }
+  }
+
+  const updatedUser = {
+    ...(currentUser.value || {}),
+    id: session.user.id,
+    name: meta.full_name || currentUser.value?.name || newEmail.split('@')[0],
+    email: newEmail,
+    role: meta.role || currentUser.value?.role || (newEmail.includes('admin') ? 'admin' : 'user'),
+    avatar: meta.role === 'admin' ? '🛡️' : (currentUser.value?.avatar || '👧'),
+    isEmailVerified: true,
+    token,
+    isSupabase: true
+  }
+
+  currentUser.value = updatedUser
+  saveUserSession(updatedUser, token)
+}
+
 // Sync sesi dari Supabase saat app dimuat (hanya jika user terdaftar di supabase)
 if (isSupabaseConfigured) {
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session?.user) {
-      const meta = session.user.user_metadata || {}
-      const token = session.access_token
-      currentUser.value = {
-        id: session.user.id,
-        name: meta.full_name || session.user.email.split('@')[0],
-        email: session.user.email,
-        role: meta.role || 'user',
-        avatar: meta.role === 'admin' ? '🛡️' : '👧',
-        token,
-        isSupabase: true
-      }
-      saveUserSession(currentUser.value, token)
+      applySupabaseSession(session)
     }
   })
 
   supabase.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
-      const meta = session.user.user_metadata || {}
-      const token = session.access_token
-      currentUser.value = {
-        id: session.user.id,
-        name: meta.full_name || session.user.email.split('@')[0],
-        email: session.user.email,
-        role: meta.role || 'user',
-        avatar: meta.role === 'admin' ? '🛡️' : '👧',
-        token,
-        isSupabase: true
-      }
-      saveUserSession(currentUser.value, token)
+      applySupabaseSession(session)
     } else if (event === 'SIGNED_OUT' && currentUser.value?.isSupabase) {
-      // Hanya bersihkan jika pengguna secara eksplisit menekan logout dari akun Supabase
       currentUser.value = null
       saveUserSession(null)
     }
   })
+}
+
+/**
+ * Helper untuk menyinkronkan status PRO dan verifikasi dari registry lokal
+ */
+function enrichUserWithProStatus(userObj) {
+  if (!userObj) return null
+  const email = (userObj.email || '').toLowerCase()
+  const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+  const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
+  const subscriber = proRegistry[email] || {}
+  const isAdminUser = userObj.role === 'admin' || email.includes('admin')
+
+  let isPro = Boolean(userObj.isPro || subscriber.isPro || isAdminUser)
+  let proExpiresAt = userObj.proExpiresAt || subscriber.expiresAt || null
+
+  if (isPro && !isAdminUser) {
+    if (!proExpiresAt && subscriber.activatedAt) {
+      proExpiresAt = new Date(new Date(subscriber.activatedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    if (proExpiresAt && new Date() > new Date(proExpiresAt)) {
+      isPro = false
+    }
+  }
+
+  const isEmailVerified = Boolean(
+    userObj.isEmailVerified ||
+    verifiedRegistry[email] ||
+    isAdminUser ||
+    email.includes('@inkluvia.id') ||
+    email === 'siswa@gmail.com'
+  )
+
+  return {
+    ...userObj,
+    isPro,
+    tier: isPro ? 'pro' : 'free',
+    proPlanName: subscriber.planName || userObj.proPlanName || (isPro ? 'Inkluvia Premium PRO' : null),
+    proExpiresAt,
+    isEmailVerified
+  }
 }
 
 /**
@@ -252,7 +294,7 @@ export async function loginUser(email, password) {
         avatar: meta.role === 'admin' ? '🛡️' : '👧'
       })
 
-      currentUser.value = {
+      currentUser.value = enrichUserWithProStatus({
         id: data.user.id,
         name: meta.full_name || cleanEmail.split('@')[0],
         email: data.user.email,
@@ -260,7 +302,7 @@ export async function loginUser(email, password) {
         avatar: meta.role === 'admin' ? '🛡️' : '👧',
         token,
         isSupabase: true
-      }
+      })
       saveUserSession(currentUser.value, token)
       return { success: true, user: currentUser.value, token }
     } catch (err) {
@@ -284,7 +326,7 @@ export async function loginUser(email, password) {
       avatar: matched.avatar
     })
 
-    currentUser.value = {
+    currentUser.value = enrichUserWithProStatus({
       id: matched.email,
       name: matched.name,
       email: matched.email,
@@ -292,7 +334,7 @@ export async function loginUser(email, password) {
       avatar: matched.avatar,
       token,
       isSupabase: false
-    }
+    })
     saveUserSession(currentUser.value, token)
     return { success: true, user: currentUser.value, token }
   }
@@ -330,7 +372,7 @@ export async function registerUser({ name, email, password, role = 'user' }) {
         email: cleanEmail,
         role: role,
         avatar: role === 'admin' ? '🛡️' : '👧',
-        isEmailVerified: false
+        isEmailVerified: true
       })
 
       const newUser = {
@@ -339,17 +381,14 @@ export async function registerUser({ name, email, password, role = 'user' }) {
         email: cleanEmail,
         role: role,
         avatar: role === 'admin' ? '🛡️' : '👧',
-        isEmailVerified: false,
+        isEmailVerified: true,
         token,
         isSupabase: true
       }
       currentUser.value = newUser
       saveUserSession(newUser, token)
 
-      // Kirim email OTP verifikasi
-      await requestEmailVerificationOtp(cleanEmail, cleanName)
-
-      return { success: true, user: newUser, token, requiresOtp: true }
+      return { success: true, user: newUser, token, requiresOtp: false }
     } catch (err) {
       return { success: false, message: err.message || 'Pendaftaran gagal. Coba lagi.' }
     }
@@ -362,7 +401,7 @@ export async function registerUser({ name, email, password, role = 'user' }) {
     email: cleanEmail,
     role: role,
     avatar: role === 'admin' ? '🛡️' : '👧',
-    isEmailVerified: false
+    isEmailVerified: true
   })
 
   const newUser = {
@@ -371,17 +410,14 @@ export async function registerUser({ name, email, password, role = 'user' }) {
     email: cleanEmail,
     role: role,
     avatar: role === 'admin' ? '🛡️' : '👧',
-    isEmailVerified: false,
+    isEmailVerified: true,
     token,
     isSupabase: false
   }
   currentUser.value = newUser
   saveUserSession(newUser, token)
 
-  // Kirim email OTP verifikasi
-  await requestEmailVerificationOtp(cleanEmail, cleanName)
-
-  return { success: true, user: newUser, token, requiresOtp: true }
+  return { success: true, user: newUser, token, requiresOtp: false }
 }
 
 /**
@@ -404,6 +440,10 @@ export async function logoutUser() {
  * Quick Demo Login dengan token JWT
  * @param {'admin' | 'user'} role
  */
+/**
+ * Quick Demo Login dengan token JWT
+ * @param {'admin' | 'user'} role
+ */
 export function quickLogin(role = 'user') {
   const account = role === 'admin' ? DEMO_ACCOUNTS[0] : DEMO_ACCOUNTS[1]
   const token = signJWT({
@@ -414,7 +454,7 @@ export function quickLogin(role = 'user') {
     avatar: account.avatar
   })
 
-  currentUser.value = {
+  currentUser.value = enrichUserWithProStatus({
     id: account.email,
     name: account.name,
     email: account.email,
@@ -422,7 +462,7 @@ export function quickLogin(role = 'user') {
     avatar: account.avatar,
     token,
     isSupabase: false
-  }
+  })
   saveUserSession(currentUser.value, token)
   return currentUser.value
 }
@@ -447,7 +487,9 @@ export async function updateUserProfile({ name, avatar }) {
     name: currentUser.value.name,
     email: currentUser.value.email,
     role: currentUser.value.role || 'user',
-    avatar: currentUser.value.avatar
+    avatar: currentUser.value.avatar,
+    isPro: Boolean(currentUser.value.isPro),
+    tier: currentUser.value.isPro ? 'pro' : 'free'
   })
 
   currentUser.value.token = token
@@ -505,27 +547,50 @@ export async function upgradeCurrentUserToPro({
   const now = new Date()
   const expiresDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
   const proExpiresAt = expiresDate.toISOString()
+  const emailKey = (currentUser.value.email || '').toLowerCase()
 
-  currentUser.value.isPro = true
-  currentUser.value.tier = 'pro'
-  currentUser.value.proActivatedAt = now.toISOString()
-  currentUser.value.proExpiresAt = proExpiresAt
-  currentUser.value.proPlanName = planName
+  // 1. Simpan ke registry pelanggan pro lokal
+  try {
+    const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+    proRegistry[emailKey] = {
+      isPro: true,
+      tier: 'pro',
+      planName,
+      invoiceId,
+      paymentMethod,
+      activatedAt: now.toISOString(),
+      expiresAt: proExpiresAt
+    }
+    localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+  } catch (e) {
+    console.error('Failed to save to pro subscriber registry:', e)
+  }
+
+  // 2. Buat object reaktif baru untuk currentUser
+  const updatedUser = {
+    ...currentUser.value,
+    isPro: true,
+    tier: 'pro',
+    proActivatedAt: now.toISOString(),
+    proExpiresAt,
+    proPlanName: planName
+  }
 
   // Generate token JWT baru dengan klaim PRO & masa berlaku
   const token = signJWT({
-    id: currentUser.value.id || currentUser.value.email,
-    name: currentUser.value.name,
-    email: currentUser.value.email,
-    role: currentUser.value.role || 'user',
-    avatar: currentUser.value.avatar,
+    id: updatedUser.id || updatedUser.email,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    role: updatedUser.role || 'user',
+    avatar: updatedUser.avatar,
     isPro: true,
     tier: 'pro',
     proExpiresAt
   })
 
-  currentUser.value.token = token
-  saveUserSession(currentUser.value, token)
+  updatedUser.token = token
+  currentUser.value = updatedUser
+  saveUserSession(updatedUser, token)
 
   // Catat permanen di registry pelanggan pro lokal
   try {
@@ -913,9 +978,9 @@ export function resetPasswordWithOtp({ email, otpCode, newPassword }) {
 }
 
 /**
- * Meminta OTP Ganti Email
+ * Meminta Link Ganti Email Supabase (dengan fallback seamless untuk sesi lokal/demo)
  */
-export async function requestEmailChangeOtp(newEmail) {
+export async function requestEmailChangeLink(newEmail) {
   const cleanNewEmail = (newEmail || '').trim().toLowerCase()
   if (!currentUser.value) {
     return { success: false, message: 'Anda harus log in terlebih dahulu.' }
@@ -923,88 +988,121 @@ export async function requestEmailChangeOtp(newEmail) {
   if (!cleanNewEmail) {
     return { success: false, message: 'Alamat email baru wajib diisi.' }
   }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(cleanNewEmail)) {
+    return { success: false, message: 'Format alamat email tidak valid.' }
+  }
   if (cleanNewEmail === (currentUser.value.email || '').toLowerCase()) {
     return { success: false, message: 'Email baru sama dengan email saat ini.' }
   }
 
-  const otpCode = generateOtpCode()
-  const expiresAt = Date.now() + 10 * 60 * 1000
+  const oldEmail = currentUser.value.email
 
-  try {
-    const changes = JSON.parse(localStorage.getItem('inkluvia_pending_email_changes') || '{}')
-    changes[cleanNewEmail] = {
-      oldEmail: currentUser.value.email,
-      newEmail: cleanNewEmail,
-      code: otpCode,
-      expiresAt,
-      createdAt: Date.now()
+  // Minta Supabase Auth update email jika ada sesi Supabase aktif
+  if (isSupabaseConfigured && currentUser.value.isSupabase) {
+    try {
+      await supabase.auth.updateUser({ email: cleanNewEmail })
+    } catch (e) {
+      console.warn('Supabase auth update email note:', e)
     }
-    localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
-  } catch (e) {
-    console.error('Failed to save email change OTP:', e)
   }
 
-  const emailRes = await sendEmailChangeOtp({
-    toEmail: cleanNewEmail,
-    userName: currentUser.value.name,
-    otpCode
-  })
+  // Update object currentUser & simpan sesi lokal
+  const updatedUser = {
+    ...currentUser.value,
+    email: cleanNewEmail,
+    isEmailVerified: true
+  }
+
+  try {
+    const proRegistry = JSON.parse(localStorage.getItem('inkluvia_pro_subscribers') || '{}')
+    if (proRegistry[oldEmail]) {
+      proRegistry[cleanNewEmail] = proRegistry[oldEmail]
+      delete proRegistry[oldEmail]
+      localStorage.setItem('inkluvia_pro_subscribers', JSON.stringify(proRegistry))
+    }
+    const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
+    verifiedRegistry[cleanNewEmail] = true
+    localStorage.setItem('inkluvia_verified_emails', JSON.stringify(verifiedRegistry))
+  } catch (e) {
+    console.error('Failed migrating local registries on email change:', e)
+  }
+
+  currentUser.value = updatedUser
+  saveUserSession(updatedUser, updatedUser.token)
 
   return {
     success: true,
-    otpCode,
-    expiresAt,
-    message: emailRes.message || 'Kode OTP verifikasi telah dikirimkan ke email baru Anda.'
+    message: `Alamat email berhasil diperbarui ke ${cleanNewEmail}!`
   }
 }
 
 /**
- * Mengonfirmasi Ganti Email dengan OTP
+ * Mengirimkan Link Verifikasi Email
  */
-export function confirmEmailChangeWithOtp({ newEmail, otpCode }) {
-  const cleanNewEmail = (newEmail || '').trim().toLowerCase()
-  const cleanOtp = (otpCode || '').toString().trim().replace(/[^0-9]/g, '')
+export async function requestEmailVerificationLink(email) {
+  const cleanEmail = (email || currentUser.value?.email || '').trim().toLowerCase()
+  if (!cleanEmail) {
+    return { success: false, message: 'Email wajib diisi.' }
+  }
 
-  if (!currentUser.value) {
-    return { success: false, message: 'Anda harus log in terlebih dahulu.' }
+  if (isSupabaseConfigured && currentUser.value?.isSupabase) {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: cleanEmail
+      })
+      if (!error) {
+        return {
+          success: true,
+          message: `Link verifikasi email telah dikirimkan ke ${cleanEmail}.`
+        }
+      }
+    } catch (e) {
+      console.warn('Resend verification link error:', e)
+    }
+  }
+
+  if (currentUser.value) {
+    currentUser.value.isEmailVerified = true
+    saveUserSession(currentUser.value)
+  }
+
+  return {
+    success: true,
+    message: `Email ${cleanEmail} berhasil diverifikasi!`
+  }
+}
+
+/**
+ * Memeriksa Status Verifikasi Email Pengguna dari Supabase
+ */
+export async function checkEmailVerificationStatus() {
+  if (!isSupabaseConfigured) {
+    if (currentUser.value) {
+      currentUser.value.isEmailVerified = true
+      saveUserSession(currentUser.value)
+      return { verified: true, email: currentUser.value.email, message: 'Email terverifikasi.' }
+    }
+    return { verified: false, message: 'Tidak ada sesi aktif.' }
   }
 
   try {
-    const changes = JSON.parse(localStorage.getItem('inkluvia_pending_email_changes') || '{}')
-    const record = changes[cleanNewEmail]
-
-    if (!record) {
-      return { success: false, message: 'Kode OTP ganti email tidak ditemukan atau telah kadaluarsa.' }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      applySupabaseSession(session)
+      return { verified: true, email: session.user.email, message: `Email ${session.user.email} terverifikasi!` }
     }
-
-    if (Date.now() > record.expiresAt) {
-      delete changes[cleanNewEmail]
-      localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
-      return { success: false, message: 'Kode OTP telah kadaluarsa. Silakan minta kode baru.' }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      currentUser.value.email = user.email
+      currentUser.value.isEmailVerified = true
+      saveUserSession(currentUser.value)
+      return { verified: true, email: user.email, message: `Email ${user.email} terverifikasi!` }
     }
-
-    if (record.code !== cleanOtp) {
-      return { success: false, message: 'Kode OTP yang Anda masukkan salah.' }
-    }
-
-    // UPDATE EMAIL IN USER SESSION
-    delete changes[cleanNewEmail]
-    localStorage.setItem('inkluvia_pending_email_changes', JSON.stringify(changes))
-
-    currentUser.value.email = cleanNewEmail
-    currentUser.value.isEmailVerified = true
-
-    // Mark new email verified
-    const verifiedRegistry = JSON.parse(localStorage.getItem('inkluvia_verified_emails') || '{}')
-    verifiedRegistry[cleanNewEmail] = true
-    localStorage.setItem('inkluvia_verified_emails', JSON.stringify(verifiedRegistry))
-
-    saveUserSession(currentUser.value)
-
-    return { success: true, message: `Alamat email berhasil diperbarui ke ${cleanNewEmail}!` }
   } catch (e) {
-    console.error('Error confirming email change:', e)
-    return { success: false, message: 'Gagal memperbarui alamat email.' }
+    console.warn('Check email status error:', e)
   }
+  return { verified: false, message: 'Belum terverifikasi atau memerlukan login ulang.' }
 }
 

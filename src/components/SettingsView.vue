@@ -4,11 +4,12 @@ import {
   currentUser,
   updateUserProfile,
   isAdmin,
+  isProUser,
   getProStatusInfo,
   changePassword,
-  requestEmailChangeOtp,
-  confirmEmailChangeWithOtp,
-  requestPasswordResetOtp
+  requestEmailChangeLink,
+  requestEmailVerificationLink,
+  checkEmailVerificationStatus,
 } from '../lib/authService'
 import {
   ArrowLeft,
@@ -129,7 +130,7 @@ const handleOpenEmailChangeModal = () => {
   emailChangeError.value = ''
 }
 
-const handleSendEmailChangeOtp = async () => {
+const handleSendEmailChangeLink = async () => {
   emailChangeError.value = ''
   emailChangeSuccess.value = ''
 
@@ -140,52 +141,79 @@ const handleSendEmailChangeOtp = async () => {
 
   isSubmittingEmailChange.value = true
   try {
-    const res = await requestEmailChangeOtp(newEmailInput.value)
+    const res = await requestEmailChangeLink(newEmailInput.value)
     if (res.success) {
-      isEmailOtpSent.value = true
-      startEmailResendTimer()
-      emailChangeSuccess.value = `Kode verifikasi 6-digit telah dikirimkan ke ${newEmailInput.value}.`
-    } else {
-      emailChangeError.value = res.message || 'Gagal mengirimkan kode verifikasi.'
-    }
-  } finally {
-    isSubmittingEmailChange.value = false
-  }
-}
-
-const handleConfirmEmailChange = async () => {
-  emailChangeError.value = ''
-  emailChangeSuccess.value = ''
-
-  const fullOtp = emailOtpDigits.value.join('')
-  if (fullOtp.length < 6) {
-    emailChangeError.value = 'Masukkan 6 digit kode OTP verifikasi.'
-    return
-  }
-
-  isSubmittingEmailChange.value = true
-  try {
-    const res = confirmEmailChangeWithOtp({
-      newEmail: newEmailInput.value,
-      otpCode: fullOtp
-    })
-
-    if (res.success) {
-      emailChangeSuccess.value = res.message || 'Email berhasil diperbarui!'
+      emailChangeSuccess.value = res.message || 'Alamat email berhasil diperbarui!'
       setTimeout(() => {
         showEmailChangeModal.value = false
-      }, 1500)
+        isEmailOtpSent.value = false
+      }, 1200)
     } else {
-      emailChangeError.value = res.message || 'Kode OTP tidak valid.'
+      emailChangeError.value = res.message || 'Gagal memperbarui alamat email.'
+    }
+  } catch (err) {
+    emailChangeError.value = err.message || 'Gagal memperbarui alamat email.'
+  } finally {
+    isSubmittingEmailChange.value = false
+  }
+}
+
+const handleCheckEmailStatus = async () => {
+  emailChangeError.value = ''
+  emailChangeSuccess.value = ''
+  isSubmittingEmailChange.value = true
+  try {
+    const res = await checkEmailVerificationStatus()
+    if (res.verified) {
+      emailChangeSuccess.value = res.message || 'Email berhasil diverifikasi!'
+      setTimeout(() => {
+        showEmailChangeModal.value = false
+        showVerifyEmailModal.value = false
+        isEmailOtpSent.value = false
+      }, 1200)
+    } else {
+      emailChangeError.value = res.message || 'Email belum terverifikasi. Silakan periksa email Anda dan klik link konfirmasi Supabase.'
     }
   } finally {
     isSubmittingEmailChange.value = false
   }
 }
 
-const handleEmailDigitInput = (index, event) => {
+// Verify Email Modal State
+const showVerifyEmailModal = ref(false)
+const isVerifyOtpSending = ref(false)
+const verifyOtpSuccess = ref('')
+const verifyOtpError = ref('')
+
+const handleOpenVerifyEmailModal = async () => {
+  showVerifyEmailModal.value = true
+  verifyOtpSuccess.value = ''
+  verifyOtpError.value = ''
+  await handleSendVerificationLink()
+}
+
+const handleSendVerificationLink = async () => {
+  if (!currentUser.value?.email) return
+  isVerifyOtpSending.value = true
+  verifyOtpError.value = ''
+  verifyOtpSuccess.value = ''
+  try {
+    const res = await requestEmailVerificationLink(currentUser.value.email)
+    if (res.success) {
+      verifyOtpSuccess.value = res.message
+    } else {
+      verifyOtpError.value = res.message || 'Gagal mengirimkan link verifikasi.'
+    }
+  } catch (err) {
+    verifyOtpError.value = 'Terjadi kesalahan saat mengirimkan link.'
+  } finally {
+    isVerifyOtpSending.value = false
+  }
+}
+
+const handleVerifyDigitInput = (index, event) => {
   const val = event.target.value.replace(/[^0-9]/g, '')
-  emailOtpDigits.value[index] = val ? val.slice(-1) : ''
+  verifyOtpDigits.value[index] = val ? val.slice(-1) : ''
 
   if (val && index < 5) {
     const inputs = event.target.parentElement?.querySelectorAll('input')
@@ -195,8 +223,8 @@ const handleEmailDigitInput = (index, event) => {
   }
 }
 
-const handleEmailDigitKeyDown = (index, event) => {
-  if (event.key === 'Backspace' && !emailOtpDigits.value[index] && index > 0) {
+const handleVerifyDigitKeyDown = (index, event) => {
+  if (event.key === 'Backspace' && !verifyOtpDigits.value[index] && index > 0) {
     const inputs = event.target.parentElement?.querySelectorAll('input')
     if (inputs && inputs[index - 1]) {
       inputs[index - 1].focus()
@@ -204,12 +232,12 @@ const handleEmailDigitKeyDown = (index, event) => {
   }
 }
 
-const handleEmailOtpPaste = (event) => {
+const handleVerifyOtpPaste = (event) => {
   event.preventDefault()
   const pasted = (event.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '')
   if (pasted) {
     for (let i = 0; i < 6; i++) {
-      emailOtpDigits.value[i] = pasted[i] || ''
+      verifyOtpDigits.value[i] = pasted[i] || ''
     }
   }
 }
@@ -669,7 +697,7 @@ onMounted(async () => {
                   <span>{{ isAdmin ? 'Administrator Inkluvia' : 'Siswa Pelajar' }}</span>
                 </span>
                 <span
-                  v-if="currentUser?.isPro || isAdmin"
+                  v-if="proStatus.isPro || isProUser || isAdmin"
                   class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-900 border border-amber-300 shadow-xs"
                 >
                   <span>👑</span>
@@ -693,18 +721,28 @@ onMounted(async () => {
                     class="w-2 h-2 rounded-full animate-pulse"
                     :class="proStatus.isPro || isAdmin ? 'bg-emerald-500' : (proStatus.isExpired ? 'bg-rose-500' : 'bg-slate-400')"
                   ></span>
-                  {{ proStatus.isPro || isAdmin ? 'Aktif & Terverifikasi' : (proStatus.isExpired ? 'Masa PRO Berakhir' : 'Akun Gratis') }}
+                  {{ (currentUser?.isEmailVerified || isAdmin) ? (proStatus.isPro ? 'Aktif & Terverifikasi (PRO)' : 'Aktif & Terverifikasi') : 'Belum Terverifikasi' }}
                 </span>
               </div>
 
               <div class="flex items-center justify-between text-slate-500">
                 <span class="font-medium">Verifikasi Email:</span>
-                <span
-                  class="font-extrabold flex items-center gap-1"
-                  :class="currentUser?.isEmailVerified || isAdmin ? 'text-emerald-600' : 'text-amber-600'"
-                >
-                  <span>{{ currentUser?.isEmailVerified || isAdmin ? '✓ Terverifikasi (Resend)' : '⚠️ Belum Terverifikasi' }}</span>
-                </span>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="font-extrabold flex items-center gap-1 text-xs"
+                    :class="currentUser?.isEmailVerified || isAdmin ? 'text-emerald-600' : 'text-amber-600'"
+                  >
+                    <span>{{ currentUser?.isEmailVerified || isAdmin ? '✓ Terverifikasi' : '⚠️ Belum Terverifikasi' }}</span>
+                  </span>
+                  <button
+                    v-if="!currentUser?.isEmailVerified && !isAdmin"
+                    @click="handleOpenVerifyEmailModal"
+                    class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-[#FF7315] hover:bg-[#e86105] text-white shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1"
+                  >
+                    <Mail class="w-3 h-3" />
+                    <span>Verifikasi Sekarang</span>
+                  </button>
+                </div>
               </div>
 
               <div class="flex items-center justify-between text-slate-500">
@@ -1032,7 +1070,7 @@ onMounted(async () => {
                     class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-100/90 text-sm font-semibold text-slate-700 cursor-not-allowed outline-none"
                   />
                 </div>
-                <span class="text-[11px] text-slate-400 mt-1 block">Klik "Ubah Email Akun" jika ingin mengganti email melalui verifikasi OTP.</span>
+                <span class="text-[11px] text-slate-400 mt-1 block">Klik "Ubah Email Akun" jika ingin mengganti alamat email akun Anda.</span>
               </div>
             </div>
 
@@ -1676,7 +1714,7 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <!-- ================= EMAIL CHANGE OTP MODAL ================= -->
+    <!-- ================= EMAIL CHANGE LINK MODAL ================= -->
     <Teleport to="body">
       <div
         v-if="showEmailChangeModal"
@@ -1691,7 +1729,7 @@ onMounted(async () => {
             </div>
             <h3 class="text-xl font-black text-[#0F3261]">Ubah Alamat Email Akun</h3>
             <p class="text-xs text-slate-500 leading-relaxed">
-              Email lama Anda saat ini adalah <strong class="text-slate-700">{{ currentUser?.email }}</strong>. Masukkan alamat email baru untuk mendapatkan kode verifikasi.
+              Email lama Anda: <strong class="text-slate-700">{{ currentUser?.email }}</strong>. Masukkan alamat email baru untuk mendapatkan link verifikasi dari Supabase.
             </p>
           </div>
 
@@ -1707,7 +1745,7 @@ onMounted(async () => {
           </div>
 
           <!-- Step 1: Input Email Baru -->
-          <form v-if="!isEmailOtpSent" @submit.prevent="handleSendEmailChangeOtp" class="space-y-4">
+          <form v-if="!isEmailOtpSent" @submit.prevent="handleSendEmailChangeLink" class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
                 Alamat Email Baru
@@ -1737,64 +1775,114 @@ onMounted(async () => {
                 :disabled="isSubmittingEmailChange"
                 class="py-3 px-4 rounded-2xl bg-[#0F3261] hover:bg-[#194784] text-xs font-bold text-white transition cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <span>{{ isSubmittingEmailChange ? 'Mengirim...' : 'Kirim Kode OTP' }}</span>
+                <span>{{ isSubmittingEmailChange ? 'Mengirim...' : 'Kirim Link Verifikasi' }}</span>
               </button>
             </div>
           </form>
 
-          <!-- Step 2: Input OTP 6-Digit -->
-          <form v-else @submit.prevent="handleConfirmEmailChange" class="space-y-4">
-            <div class="space-y-2">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide text-center">
-                Masukkan 6-Digit Kode Verifikasi OTP
-              </label>
-              
-              <!-- 6 Digit Input Boxes -->
-              <div class="flex items-center justify-center gap-2" @paste="handleEmailOtpPaste">
-                <input
-                  v-for="(digit, idx) in emailOtpDigits"
-                  :key="idx"
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="1"
-                  :value="digit"
-                  @input="handleEmailDigitInput(idx, $event)"
-                  @keydown="handleEmailDigitKeyDown(idx, $event)"
-                  class="w-11 h-13 text-center text-xl font-black rounded-xl border-2 border-slate-200 focus:border-[#3DA5FF] focus:ring-2 focus:ring-[#3DA5FF]/20 text-[#0F3261] bg-slate-50 outline-none transition"
-                />
-              </div>
-            </div>
-
-            <!-- Resend Timer CTA -->
-            <div class="text-center pt-1">
-              <button
-                type="button"
-                @click="handleSendEmailChangeOtp"
-                :disabled="emailResendTimer > 0 || isSubmittingEmailChange"
-                class="text-xs font-bold text-[#3587CE] disabled:text-slate-400 hover:underline cursor-pointer disabled:cursor-not-allowed"
-              >
-                <span v-if="emailResendTimer > 0">Kirim ulang OTP dalam ({{ emailResendTimer }}s)</span>
-                <span v-else>Belum menerima kode? Kirim Ulang OTP</span>
-              </button>
+          <!-- Step 2: Menunggu Link Konfirmasi -->
+          <div v-else class="space-y-4">
+            <div class="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs leading-relaxed space-y-2">
+              <p class="font-bold flex items-center gap-1.5 text-sm">
+                <span>📩</span>
+                <span>Link Verifikasi Telah Dikirim!</span>
+              </p>
+              <p>
+                Kami telah mengirimkan link konfirmasi verifikasi email ke <strong class="underline font-bold">{{ newEmailInput }}</strong>.
+              </p>
+              <p class="text-[11px] text-blue-700 pt-1">
+                👉 <em>Buka email Anda dan klik <strong>Link Konfirmasi</strong> dari Supabase. Setelah diklik, email akun Anda akan otomatis ter-update!</em>
+              </p>
             </div>
 
             <div class="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
+                @click="handleCheckEmailStatus"
+                :disabled="isSubmittingEmailChange"
+                class="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Cek Status Verifikasi</span>
+              </button>
+              <button
+                type="button"
                 @click="isEmailOtpSent = false"
                 class="py-3 px-4 rounded-2xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
               >
-                Ganti Email
-              </button>
-              <button
-                type="submit"
-                :disabled="isSubmittingEmailChange"
-                class="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <span>{{ isSubmittingEmailChange ? 'Verifikasi...' : 'Verifikasi & Simpan Email' }}</span>
+                Kirim Ulang Link
               </button>
             </div>
-          </form>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Modal Verifikasi Email Akun -->
+    <Teleport to="body">
+      <div
+        v-if="showVerifyEmailModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      >
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative space-y-5 animate-scale-up">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-200 text-[#FF7315] flex items-center justify-center font-bold">
+                <Mail class="w-5 h-5" />
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-[#0F3261]">Verifikasi Email Akun</h3>
+                <p class="text-xs text-slate-400 font-medium">Link Verifikasi Supabase</p>
+              </div>
+            </div>
+            <button
+              @click="showVerifyEmailModal = false"
+              class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div v-if="verifyOtpSuccess" class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+            <CheckCircle2 class="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{{ verifyOtpSuccess }}</span>
+          </div>
+
+          <div v-if="verifyOtpError" class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+            {{ verifyOtpError }}
+          </div>
+
+          <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed space-y-2">
+              <p class="font-bold flex items-center gap-1.5">
+                <span>📩</span>
+                <span>Link Verifikasi Dikirim</span>
+              </p>
+              <p>
+                Link verifikasi telah dikirimkan ke <strong class="font-bold underline">{{ currentUser?.email }}</strong>.
+              </p>
+              <p class="text-[11px] text-amber-800 pt-1">
+                👉 <em>Buka email Anda dan klik link konfirmasi untuk memverifikasi akun Anda.</em>
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                @click="handleCheckEmailStatus"
+                class="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Cek Status Verifikasi</span>
+              </button>
+              <button
+                type="button"
+                @click="handleSendVerificationLink"
+                :disabled="isVerifyOtpSending"
+                class="py-3 px-4 rounded-2xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                <span>Kirim Ulang Link</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
